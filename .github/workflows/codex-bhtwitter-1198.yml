@@ -76,6 +76,8 @@ jobs:
           THEOS: ${{ github.workspace }}/theos
         run: |
           set -euo pipefail
+          sed -i '' 's/TARGET := iphone:clang:latest:14.0/TARGET := iphone:clang:16.5:14.0/' Makefile
+          grep -q 'TARGET := iphone:clang:16.5:14.0' Makefile
           chmod +x build.sh
           ./build.sh --sideloaded
           test -f packages/BHTwitter-sideloaded.ipa

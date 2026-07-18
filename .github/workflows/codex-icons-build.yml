@@ -1,0 +1,132 @@
+name: Codex NeoFreeBird icon build
+
+on:
+  push:
+    paths:
+      - '.github/workflows/codex-icons-build.yml'
+  workflow_dispatch:
+
+permissions:
+  actions: read
+  contents: read
+
+jobs:
+  build-icons-ipa:
+    runs-on: macos-14
+    steps:
+      - name: Download previously verified unsigned 12.8 IPA
+        uses: actions/download-artifact@v4
+        with:
+          name: NeoFreeBird-sideloaded_X-12.8_unsigned
+          path: base
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          run-id: 29642828380
+
+      - name: Check out official NeoFreeBird app assets
+        uses: actions/checkout@v4
+        with:
+          repository: NeoFreeBird/app
+          ref: main
+          path: app
+          sparse-checkout: assets/main
+          sparse-checkout-cone-mode: false
+
+      - name: Add NeoFreeBird primary and alternate icons
+        shell: bash
+        run: |
+          set -euo pipefail
+          BASE_IPA="$(find base -type f -name '*.ipa' -print -quit)"
+          test -n "$BASE_IPA"
+          mkdir stage
+          ditto -x -k "$BASE_IPA" stage
+          APP_DIR="$(find stage/Payload -mindepth 1 -maxdepth 1 -type d -name '*.app' -print -quit)"
+          test -n "$APP_DIR"
+          REF_DIR="$GITHUB_WORKSPACE/app/assets/main"
+
+          cp "$REF_DIR/Assets.car" "$APP_DIR/Assets.car"
+          find "$REF_DIR" -maxdepth 1 -type f \(             -name 'Custom-Icon-*.png' -o             -name 'Legacy-Icon-*.png' -o             -name 'Seasonal-Icon-*.png' -o             -name 'ProductionAppIcon*.png' \)             -exec cp {} "$APP_DIR/" \;
+
+          APP_DIR="$APP_DIR" REF_DIR="$REF_DIR" python3 <<'PY'
+          import copy
+          import glob
+          import os
+          import plistlib
+
+          app_dir = os.environ["APP_DIR"]
+          ref_dir = os.environ["REF_DIR"]
+          app_plist_path = os.path.join(app_dir, "Info.plist")
+          ref_plist_path = os.path.join(ref_dir, "Info.plist")
+
+          with open(app_plist_path, "rb") as f:
+              app_plist = plistlib.load(f)
+          with open(ref_plist_path, "rb") as f:
+              ref_plist = plistlib.load(f)
+
+          original_version = app_plist.get("CFBundleShortVersionString")
+          original_build = app_plist.get("CFBundleVersion")
+          original_identifier = app_plist.get("CFBundleIdentifier")
+
+          for key in ("CFBundleIcons", "CFBundleIcons~ipad"):
+              app_plist[key] = copy.deepcopy(ref_plist[key])
+          app_plist["CFBundleDisplayName"] = "Twitter"
+          app_plist["CFBundleName"] = "Twitter"
+
+          assert original_version == "12.8", original_version
+          assert original_identifier == "com.atebits.Tweetie2", original_identifier
+          assert app_plist["CFBundleShortVersionString"] == original_version
+          assert app_plist["CFBundleVersion"] == original_build
+          assert app_plist["CFBundleIdentifier"] == original_identifier
+
+          for key in ("CFBundleIcons", "CFBundleIcons~ipad"):
+              icon_set = app_plist[key]
+              alternates = icon_set["CFBundleAlternateIcons"]
+              assert len(alternates) == 60, (key, len(alternates))
+              candidates = [icon_set["CFBundlePrimaryIcon"], *alternates.values()]
+              for icon in candidates:
+                  for stem in icon.get("CFBundleIconFiles", []):
+                      assert glob.glob(os.path.join(app_dir, stem + "*")), (key, stem)
+
+          with open(app_plist_path, "wb") as f:
+              plistlib.dump(app_plist, f, fmt=plistlib.FMT_BINARY, sort_keys=False)
+
+          print("Bundle ID:", original_identifier)
+          print("Version:", original_version, "build", original_build)
+          print("iPhone alternate icons:", len(app_plist["CFBundleIcons"]["CFBundleAlternateIcons"]))
+          print("iPad alternate icons:", len(app_plist["CFBundleIcons~ipad"]["CFBundleAlternateIcons"]))
+          print("Primary icon:", app_plist["CFBundleIcons"]["CFBundlePrimaryIcon"]["CFBundleIconName"])
+          PY
+
+          find stage -type d -name _CodeSignature -prune -exec rm -rf {} +
+          find stage -type f -name embedded.mobileprovision -delete
+          OUTPUT="$GITHUB_WORKSPACE/NeoFreeBird-icons_X-12.8_unsigned.ipa"
+          (cd stage && /usr/bin/zip -qry "$OUTPUT" Payload)
+          /usr/bin/unzip -t "$OUTPUT" >/dev/null
+
+          OUTPUT="$OUTPUT" python3 <<'PY'
+          import os
+          import plistlib
+          import zipfile
+
+          output = os.environ["OUTPUT"]
+          with zipfile.ZipFile(output) as z:
+              names = z.namelist()
+              plist_name = next(n for n in names if n.startswith("Payload/") and n.endswith(".app/Info.plist"))
+              plist = plistlib.loads(z.read(plist_name))
+              assert plist["CFBundleIdentifier"] == "com.atebits.Tweetie2"
+              assert plist["CFBundleShortVersionString"] == "12.8"
+              assert len(plist["CFBundleIcons"]["CFBundleAlternateIcons"]) == 60
+              assert len(plist["CFBundleIcons~ipad"]["CFBundleAlternateIcons"]) == 60
+              assert any(n.endswith("/BHTwitter.dylib") for n in names)
+              assert not any("/_CodeSignature/" in n for n in names)
+              assert not any(n.endswith("/embedded.mobileprovision") for n in names)
+              print("Final IPA bytes:", os.path.getsize(output))
+              print("Verified unsigned icon-enhanced IPA")
+          PY
+
+      - name: Upload unsigned icon-enhanced IPA
+        uses: actions/upload-artifact@v4
+        with:
+          name: NeoFreeBird-icons_X-12.8_unsigned
+          path: NeoFreeBird-icons_X-12.8_unsigned.ipa
+          compression-level: 0
+          if-no-files-found: error

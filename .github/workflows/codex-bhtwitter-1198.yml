@@ -1,4 +1,4 @@
-name: Codex BHTwitter 11.98 NeoFreeBird build
+name: Codex publish verified BHTwitter 11.98 IPA
 
 on:
   push:
@@ -7,173 +7,27 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  actions: read
+  contents: write
 
 jobs:
-  build:
-    name: Build BHTwitter 11.98 unsigned IPA
-    runs-on: macos-14
+  publish:
+    runs-on: ubuntu-latest
     steps:
-      - name: Check out current BHTwitter source
-        uses: actions/checkout@v4
+      - name: Download verified build artifact
+        uses: actions/download-artifact@v4
         with:
-          repository: BandarHL/BHTwitter
-          ref: master
-          path: main
-          submodules: recursive
+          name: BHTwitter-latest_X-11.98_NeoFreeBird-icons_unsigned
+          path: out
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          run-id: 29645916652
 
-      - name: Check out NeoFreeBird icon assets
-        uses: actions/checkout@v4
-        with:
-          repository: NeoFreeBird/app
-          ref: main
-          path: app
-          sparse-checkout: assets/main
-          sparse-checkout-cone-mode: false
-
-      - name: Install build tools
-        run: brew install make dpkg ldid
-
-      - name: Use GNU Make
-        run: echo "$(brew --prefix make)/libexec/gnubin" >> "$GITHUB_PATH"
-
-      - name: Download Theos
-        uses: actions/checkout@v4
-        with:
-          repository: theos/theos
-          ref: master
-          path: theos
-          submodules: recursive
-
-      - name: Install cyan
-        run: python3 -m pip install --break-system-packages https://github.com/asdfzxcvbn/pyzule-rw/archive/main.zip
-
-      - name: Download iOS 16.5 SDK
-        run: |
-          git clone -n --depth=1 --filter=tree:0 https://github.com/theos/sdks/
-          cd sdks
-          git sparse-checkout set --no-cone iPhoneOS16.5.sdk
-          git checkout
-          mv ./*.sdk "$THEOS/sdks"
-        env:
-          THEOS: ${{ github.workspace }}/theos
-
-      - name: Download Twitter 11.98 decrypted IPA
+      - name: Verify and publish IPA to release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
-          mkdir -p main/packages
-          ASSET_ID="$(gh api "repos/${{ github.repository }}/releases/tags/tweak" --jq '.assets[] | select(.name == "com.atebits.Tweetie2_11.98_und3fined.ipa") | .id' | head -n 1)"
-          test -n "$ASSET_ID"
-          gh api -H "Accept: application/octet-stream" "repos/${{ github.repository }}/releases/assets/$ASSET_ID" > main/packages/com.atebits.Tweetie2.ipa
-          test -s main/packages/com.atebits.Tweetie2.ipa
-          unzip -tq main/packages/com.atebits.Tweetie2.ipa
-
-      - name: Build current BHTwitter for sideloading
-        working-directory: main
-        env:
-          THEOS: ${{ github.workspace }}/theos
-        run: |
-          set -euo pipefail
-          sed -i '' 's/TARGET := iphone:clang:latest:14.0/TARGET := iphone:clang:16.5:14.0/' Makefile
-          grep -q 'TARGET := iphone:clang:16.5:14.0' Makefile
-          chmod +x build.sh
-          ./build.sh --sideloaded
-          test -f packages/BHTwitter-sideloaded.ipa
-          echo "BHTwitter source commit: $(git rev-parse HEAD)" | tee -a "$GITHUB_STEP_SUMMARY"
-
-      - name: Merge NeoFreeBird icons and verify unsigned IPA
-        shell: bash
-        run: |
-          set -euo pipefail
-          BASE_IPA="$GITHUB_WORKSPACE/main/packages/BHTwitter-sideloaded.ipa"
-          STAGE="$(mktemp -d)"
-          ditto -x -k "$BASE_IPA" "$STAGE"
-          APP_DIR="$(find "$STAGE/Payload" -mindepth 1 -maxdepth 1 -type d -name '*.app' -print -quit)"
-          test -n "$APP_DIR"
-          REF_DIR="$GITHUB_WORKSPACE/app/assets/main"
-          cp "$REF_DIR/Assets.car" "$APP_DIR/Assets.car"
-          find "$REF_DIR" -maxdepth 1 -type f \( -name 'Custom-Icon-*.png' -o -name 'Legacy-Icon-*.png' -o -name 'Seasonal-Icon-*.png' -o -name 'ProductionAppIcon*.png' \) -exec cp {} "$APP_DIR/" \;
-          APP_DIR="$APP_DIR" REF_DIR="$REF_DIR" python3 <<'PY'
-          import copy
-          import glob
-          import os
-          import plistlib
-          app_dir = os.environ["APP_DIR"]
-          ref_dir = os.environ["REF_DIR"]
-          app_plist_path = os.path.join(app_dir, "Info.plist")
-          ref_plist_path = os.path.join(ref_dir, "Info.plist")
-          with open(app_plist_path, "rb") as f:
-              app_plist = plistlib.load(f)
-          with open(ref_plist_path, "rb") as f:
-              ref_plist = plistlib.load(f)
-          original_version = app_plist.get("CFBundleShortVersionString")
-          original_build = app_plist.get("CFBundleVersion")
-          original_identifier = app_plist.get("CFBundleIdentifier")
-          assert original_version == "11.98", original_version
-          assert original_build == "12", original_build
-          assert original_identifier == "com.atebits.Tweetie2", original_identifier
-          for key in ("CFBundleIcons", "CFBundleIcons~ipad"):
-              app_plist[key] = copy.deepcopy(ref_plist[key])
-          app_plist["CFBundleDisplayName"] = "Twitter"
-          app_plist["CFBundleName"] = "Twitter"
-          for key in ("CFBundleIcons", "CFBundleIcons~ipad"):
-              icon_set = app_plist[key]
-              alternates = icon_set["CFBundleAlternateIcons"]
-              assert len(alternates) == 60, (key, len(alternates))
-              candidates = [icon_set["CFBundlePrimaryIcon"], *alternates.values()]
-              for icon in candidates:
-                  for stem in icon.get("CFBundleIconFiles", []):
-                      assert glob.glob(os.path.join(app_dir, stem + "*")), (key, stem)
-          assert app_plist["CFBundleIcons"]["CFBundlePrimaryIcon"]["CFBundleIconName"] == "ProductionAppIcon"
-          with open(app_plist_path, "wb") as f:
-              plistlib.dump(app_plist, f, fmt=plistlib.FMT_BINARY, sort_keys=False)
-          print("Bundle ID:", original_identifier)
-          print("Version:", original_version, "build", original_build)
-          print("Alternate icons:", len(app_plist["CFBundleIcons"]["CFBundleAlternateIcons"]))
-          PY
-          find "$STAGE/Payload" -type d -name _CodeSignature -prune -exec rm -rf {} +
-          find "$STAGE/Payload" -type f -name embedded.mobileprovision -delete
-          OUTPUT="$GITHUB_WORKSPACE/BHTwitter-latest_X-11.98_NeoFreeBird-icons_unsigned.ipa"
-          (cd "$STAGE" && /usr/bin/zip -qry "$OUTPUT" Payload)
-          /usr/bin/unzip -t "$OUTPUT" >/dev/null
-          OUTPUT="$OUTPUT" python3 <<'PY'
-          import os
-          import plistlib
-          import zipfile
-          output = os.environ["OUTPUT"]
-          with zipfile.ZipFile(output) as z:
-              names = z.namelist()
-              plist_name = next(n for n in names if n.startswith("Payload/") and n.count("/") == 2 and n.endswith(".app/Info.plist"))
-              plist = plistlib.loads(z.read(plist_name))
-              assert plist["CFBundleIdentifier"] == "com.atebits.Tweetie2"
-              assert plist["CFBundleShortVersionString"] == "11.98"
-              assert plist["CFBundleVersion"] == "12"
-              assert plist["CFBundleIcons"]["CFBundlePrimaryIcon"]["CFBundleIconName"] == "ProductionAppIcon"
-              assert len(plist["CFBundleIcons"]["CFBundleAlternateIcons"]) == 60
-              assert len(plist["CFBundleIcons~ipad"]["CFBundleAlternateIcons"]) == 60
-              assert any(n.endswith("/Assets.car") for n in names)
-              assert any(n.endswith("/BHTwitter.dylib") for n in names)
-              assert any(n.endswith("/keychainfix.dylib") for n in names)
-              assert any("/BHTwitter.bundle/" in n for n in names)
-              assert not any("libbhFLEX" in n for n in names)
-              assert not any("/_CodeSignature/" in n for n in names)
-              assert not any(n.endswith("/embedded.mobileprovision") for n in names)
-          print("Final IPA bytes:", os.path.getsize(output))
-          print("Verified BHTwitter 11.98 unsigned icon-enhanced IPA")
-          PY
-          EXECUTABLE="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleExecutable' "$APP_DIR/Info.plist")"
-          xcrun otool -l "$APP_DIR/$EXECUTABLE" | awk '/cryptid/{print $2}' | grep -qx 0
-          if codesign --verify --deep --strict "$APP_DIR" 2>/dev/null; then
-            echo "Unexpected valid signature remains"
-            exit 1
-          fi
-
-      - name: Upload verified unsigned IPA
-        uses: actions/upload-artifact@v4
-        with:
-          name: BHTwitter-latest_X-11.98_NeoFreeBird-icons_unsigned
-          path: BHTwitter-latest_X-11.98_NeoFreeBird-icons_unsigned.ipa
-          compression-level: 0
-          if-no-files-found: error
+          IPA="out/BHTwitter-latest_X-11.98_NeoFreeBird-icons_unsigned.ipa"
+          test -f "$IPA"
+          echo "fd198a97d395bf9c10d56a6176c48b4d2deb00db6f0d74f2af8c91f56ed86129  $IPA" | sha256sum -c -
+          gh release upload tweak "$IPA" --clobber --repo "${{ github.repository }}"

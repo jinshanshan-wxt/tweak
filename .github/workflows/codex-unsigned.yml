@@ -1,0 +1,90 @@
+name: Codex Build NeoFreeBird Unsigned IPA
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build unsigned sideload IPA
+    runs-on: macos-14
+    steps:
+      - name: Checkout tweak source
+        uses: actions/checkout@v4
+        with:
+          path: main
+          submodules: recursive
+
+      - name: Install build tools
+        run: brew install make dpkg ldid
+
+      - name: Use GNU Make
+        run: echo "$(brew --prefix make)/libexec/gnubin" >> "$GITHUB_PATH"
+
+      - name: Download Theos
+        uses: actions/checkout@v4
+        with:
+          repository: theos/theos
+          ref: master
+          path: theos
+          submodules: recursive
+
+      - name: Install cyan
+        run: pip3 install https://github.com/asdfzxcvbn/pyzule-rw/archive/main.zip
+
+      - name: Download iOS 16.5 SDK
+        run: |
+          git clone -n --depth=1 --filter=tree:0 https://github.com/theos/sdks/
+          cd sdks
+          git sparse-checkout set --no-cone iPhoneOS16.5.sdk
+          git checkout
+          mv ./*.sdk "$THEOS/sdks"
+        env:
+          THEOS: ${{ github.workspace }}/theos
+
+      - name: Download decrypted IPA from private draft release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          ASSET_ID="$(gh api --paginate "repos/${{ github.repository }}/releases?per_page=100" --jq '.[] | select(.draft == true) | .assets[] | select(.name == "com.atebits.Tweetie2_12.8_und3fined.ipa") | .id' | head -n 1)"
+          test -n "$ASSET_ID"
+          gh api -H "Accept: application/octet-stream" "repos/${{ github.repository }}/releases/assets/$ASSET_ID" > main/packages/com.atebits.Tweetie2.ipa
+          test -s main/packages/com.atebits.Tweetie2.ipa
+
+      - name: Build sideload IPA
+        working-directory: main
+        env:
+          THEOS: ${{ github.workspace }}/theos
+        run: |
+          chmod +x build.sh
+          ./build.sh --sideloaded
+          test -f packages/NeoFreeBird-sideloaded.ipa
+
+      - name: Remove residual signatures and verify unsigned package
+        working-directory: main
+        run: |
+          IPA="packages/NeoFreeBird-sideloaded.ipa"
+          OUT="packages/NeoFreeBird-sideloaded_4.2_X-12.8_unsigned.ipa"
+          STAGE="$(mktemp -d)"
+          unzip -q "$IPA" -d "$STAGE"
+          find "$STAGE/Payload" -type d -name _CodeSignature -prune -exec rm -rf {} +
+          find "$STAGE/Payload" -type f -name embedded.mobileprovision -delete
+          rm -f "$OUT"
+          (cd "$STAGE" && zip -qry "$GITHUB_WORKSPACE/main/$OUT" Payload)
+          unzip -tq "$OUT"
+          APP="$(find "$STAGE/Payload" -maxdepth 1 -type d -name '*.app' | head -n 1)"
+          if codesign --verify --deep --strict "$APP" 2>/dev/null; then
+            echo "Unexpected valid signature remains"
+            exit 1
+          fi
+          echo "Unsigned IPA verified: $OUT"
+
+      - name: Upload unsigned IPA
+        uses: actions/upload-artifact@v4
+        with:
+          name: NeoFreeBird-sideloaded_X-12.8_unsigned
+          path: main/packages/NeoFreeBird-sideloaded_4.2_X-12.8_unsigned.ipa
+          if-no-files-found: error
+          compression-level: 0

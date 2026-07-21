@@ -70,6 +70,167 @@ jobs:
           make SIDELOADED=1
           test -f .theos/obj/debug/BHTwitter.dylib
           strings .theos/obj/debug/BHTwitter.dylib | grep 'setPrefetchingEnabled:' >/dev/null
+          strings .theos/obj/debug/BHTwitter.dylib | grep 'horizontalLayoutOffset' >/dev/null
+
+      - name: Replace only BHTwitter dylib and verify load commands
+        shell: bash
+        run: |
+          set -euo pipefail
+          BASE_IPA="$GITHUB_WORKSPACE/main/packages/com.atebits.Tweetie2.ipa"
+          STAGE="$(mktemp -d)"
+          ditto -x -k "$BASE_IPA" "$STAGE"
+          APP_DIR="$(find "$STAGE/Payload" -mindepth 1 -maxdepth 1 -type d -name '*.app' -print -quit)"
+          test -n "$APP_DIR"
+          BUILT_DYLIB="$GITHUB_WORKSPACE/main/.theos/obj/debug/BHTwitter.dylib"
+          EMBEDDED_DYLIB="$(find "$APP_DIR" -type f -name BHTwitter.dylib -print -quit)"
+          test -n "$EMBEDDED_DYLIB"
+          while IFS= read -r DEP; do
+            case "$DEP" in
+              /Library/Frameworks/*)
+                PORTABLE="@rpath/${DEP#/Library/Frameworks/}"
+                echo "Rewriting $DEP -> $PORTABLE"
+                install_name_tool -change "$DEP" "$PORTABLE" "$BUILT_DYLIB"
+                ;;
+            esac
+          done < <(xcrun otool -L "$BUILT_DYLIB" | tail -n +2 | awk '{print $1}')
+          if xcrun otool -L "$BUILT_DYLIB" | grep -E '^[[:space:]]*/Library/Frameworks/'; then
+            echo "Absolute jailbreak framework path remains"
+            exit 1
+          fi
+          for FRAMEWORK in Cephei CepheiPrefs CepheiUI CydiaSubstrate; do
+            test -f "$APP_DIR/Frameworks/$FRAMEWORK.framework/$FRAMEWORK"
+          done
+          SOURCE_BUNDLE="$GITHUB_WORKSPACE/main/layout/Library/Application Support/BHT/BHTwitter.bundle"
+          for LOCALE in en zh_CN zh-Hant; do
+            SOURCE_STRINGS="$SOURCE_BUNDLE/$LOCALE.lproj/Localizable.strings"
+            test -f "$SOURCE_STRINGS"
+            mkdir -p "$APP_DIR/BHTwitter.bundle/$LOCALE.lproj"
+            cp "$SOURCE_STRINGS" "$APP_DIR/BHTwitter.bundle/$LOCALE.lproj/Localizable.strings"
+          done
+          grep 'MODERN_SETTINGS_SEARCH_TITLE.*搜索与发现' "$APP_DIR/BHTwitter.bundle/zh_CN.lproj/Localizable.strings" >/dev/null
+          cp "$BUILT_DYLIB" "$EMBEDDED_DYLIB"
+          if xcrun otool -L "$EMBEDDED_DYLIB" | grep -E '^[[:space:]]*/Library/Frameworks/'; then
+            echo "Embedded dylib still contains an absolute jailbreak path"
+            exit 1
+          fi
+          strings "$EMBEDDED_DYLIB" | grep 'setPrefetchingEnabled:' >/dev/null
+          strings "$EMBEDDED_DYLIB" | grep 'horizontalLayoutOffset' >/dev/null
+          EXECUTABLE="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleExecutable' "$APP_DIR/Info.plist")"
+          LOAD_COMMANDS="$(xcrun otool -L "$APP_DIR/$EXECUTABLE")"
+          test "$(printf '%s\n' "$LOAD_COMMANDS" | grep -c 'BHTwitter.dylib')" -eq 1
+          test "$(printf '%s\n' "$LOAD_COMMANDS" | grep -c 'keychainfix.dylib')" -eq 1
+          printf '%s\n' "$LOAD_COMMANDS" | grep 'BHTwitter.dylib'
+          printf '%s\n' "$LOAD_COMMANDS" | grep 'keychainfix.dylib'
+          find "$STAGE/Payload" -type d -name _CodeSignature -prune -exec rm -rf {} +
+          find "$STAGE/Payload" -type f -name embedded.mobileprovision -delete
+          OUTPUT="$GITHUB_WORKSPACE/BHTwitter-iOS26fix5_X-11.98_NeoFreeBird-icons_zh-CN_unsigned.ipa"
+          (cd "$STAGE" && /usr/bin/zip -qry "$OUTPUT" Payload)
+          OUTPUT="$OUTPUT" python3 <<'PY'
+          import os, plistlib, zipfile
+          output = os.environ['OUTPUT']
+          with zipfile.ZipFile(output) as z:
+              names = z.namelist()
+              plist_name = next(n for n in names if n.startswith('Payload/') and n.count('/') == 2 and n.endswith('.app/Info.plist'))
+              plist = plistlib.loads(z.read(plist_name))
+              assert plist['CFBundleIdentifier'] == 'com.atebits.Tweetie2'
+              assert plist['CFBundleShortVersionString'] == '11.98'
+              assert plist['CFBundleVersion'] == '12'
+              assert plist['CFBundleIcons']['CFBundlePrimaryIcon']['CFBundleIconName'] == 'ProductionAppIcon'
+              assert len(plist['CFBundleIcons']['CFBundleAlternateIcons']) == 60
+              assert sum(n.endswith('/BHTwitter.dylib') for n in names) == 1
+              assert sum(n.endswith('/keychainfix.dylib') for n in names) == 1
+              assert any(n.endswith('/BHTwitter.bundle/en.lproj/Localizable.strings') for n in names)
+              assert any(n.endswith('/BHTwitter.bundle/zh_CN.lproj/Localizable.strings') for n in names)
+              assert any(n.endswith('/BHTwitter.bundle/zh-Hant.lproj/Localizable.strings') for n in names)
+              assert not any('/_CodeSignature/' in n for n in names)
+              assert not any(n.endswith('/embedded.mobileprovision') for n in names)
+          print('Verified no duplicate injected dylib files:', os.path.getsize(output), 'bytes')
+          PY
+          echo "OUTPUT=$OUTPUT" >> "$GITHUB_ENV"
+          echo "Source commit: $(git -C main rev-parse HEAD)" >> "$GITHUB_STEP_SUMMARY"
+          echo "IPA SHA-256: $(shasum -a 256 "$OUTPUT" | awk '{print $1}')" >> "$GITHUB_STEP_SUMMARY"
+          echo "BHTwitter load commands: 1" >> "$GITHUB_STEP_SUMMARY"
+          echo "keychainfix load commands: 1" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload verified unsigned IPA
+        uses: actions/upload-artifact@v4
+        with:
+          name: BHTwitter-iOS26fix5_X-11.98_NeoFreeBird-icons_zh-CN_unsigned
+          path: ${{ env.OUTPUT }}
+          compression-level: 0
+          if-no-files-found: error
+          retention-days: 30name: Codex rebuild BHTwitter 11.98 iOS 26 fix
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  build:
+    runs-on: macos-14
+    steps:
+      - name: Checkout patched BHTwitter
+        uses: actions/checkout@v4
+        with:
+          path: main
+          submodules: recursive
+
+      - name: Install build dependencies
+        run: brew install make dpkg ldid
+
+      - name: Add GNU Make to PATH
+        run: echo "$(brew --prefix make)/libexec/gnubin" >> "$GITHUB_PATH"
+
+      - name: Download Theos
+        uses: actions/checkout@v4
+        with:
+          repository: theos/theos
+          ref: master
+          path: theos
+          submodules: recursive
+
+      - name: Download iOS 16.5 SDK
+        env:
+          THEOS: ${{ github.workspace }}/theos
+        run: |
+          git clone -n --depth=1 --filter=tree:0 https://github.com/theos/sdks/ sdks
+          cd sdks
+          git sparse-checkout set --no-cone iPhoneOS16.5.sdk
+          git checkout
+          mv ./*.sdk "$THEOS/sdks/"
+
+      - name: Download previous verified 11.98 artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: BHTwitter-latest_X-11.98_NeoFreeBird-icons_unsigned
+          path: previous
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          run-id: 29645916652
+
+      - name: Prepare known-good 11.98 base IPA
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p main/packages
+          BASE_IPA="$(find previous -type f -name '*.ipa' -print -quit)"
+          test -n "$BASE_IPA"
+          cp "$BASE_IPA" main/packages/com.atebits.Tweetie2.ipa
+          unzip -tq main/packages/com.atebits.Tweetie2.ipa
+
+      - name: Compile patched BHTwitter without reinjection
+        working-directory: main
+        env:
+          THEOS: ${{ github.workspace }}/theos
+        run: |
+          set -euo pipefail
+          make clean || true
+          rm -rf .theos
+          make SIDELOADED=1
+          test -f .theos/obj/debug/BHTwitter.dylib
+          strings .theos/obj/debug/BHTwitter.dylib | grep 'setPrefetchingEnabled:' >/dev/null
 
       - name: Replace only BHTwitter dylib and verify load commands
         shell: bash

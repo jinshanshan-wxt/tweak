@@ -83,7 +83,27 @@ jobs:
           BUILT_DYLIB="$GITHUB_WORKSPACE/main/.theos/obj/debug/BHTwitter.dylib"
           EMBEDDED_DYLIB="$(find "$APP_DIR" -type f -name BHTwitter.dylib -print -quit)"
           test -n "$EMBEDDED_DYLIB"
+          while IFS= read -r DEP; do
+            case "$DEP" in
+              /Library/Frameworks/*)
+                PORTABLE="@rpath/${DEP#/Library/Frameworks/}"
+                echo "Rewriting $DEP -> $PORTABLE"
+                install_name_tool -change "$DEP" "$PORTABLE" "$BUILT_DYLIB"
+                ;;
+            esac
+          done < <(xcrun otool -L "$BUILT_DYLIB" | tail -n +2 | awk '{print $1}')
+          if xcrun otool -L "$BUILT_DYLIB" | grep '/Library/Frameworks/'; then
+            echo "Absolute jailbreak framework path remains"
+            exit 1
+          fi
+          for FRAMEWORK in Cephei CepheiPrefs CepheiUI CydiaSubstrate; do
+            test -f "$APP_DIR/Frameworks/$FRAMEWORK.framework/$FRAMEWORK"
+          done
           cp "$BUILT_DYLIB" "$EMBEDDED_DYLIB"
+          if xcrun otool -L "$EMBEDDED_DYLIB" | grep '/Library/Frameworks/'; then
+            echo "Embedded dylib still contains an absolute jailbreak path"
+            exit 1
+          fi
           strings "$EMBEDDED_DYLIB" | grep 'setPrefetchingEnabled:' >/dev/null
           EXECUTABLE="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleExecutable' "$APP_DIR/Info.plist")"
           LOAD_COMMANDS="$(xcrun otool -L "$APP_DIR/$EXECUTABLE")"
@@ -93,7 +113,7 @@ jobs:
           printf '%s\n' "$LOAD_COMMANDS" | grep 'keychainfix.dylib'
           find "$STAGE/Payload" -type d -name _CodeSignature -prune -exec rm -rf {} +
           find "$STAGE/Payload" -type f -name embedded.mobileprovision -delete
-          OUTPUT="$GITHUB_WORKSPACE/BHTwitter-iOS26fix2_X-11.98_NeoFreeBird-icons_unsigned.ipa"
+          OUTPUT="$GITHUB_WORKSPACE/BHTwitter-iOS26fix3_X-11.98_NeoFreeBird-icons_unsigned.ipa"
           (cd "$STAGE" && /usr/bin/zip -qry "$OUTPUT" Payload)
           OUTPUT="$OUTPUT" python3 <<'PY'
           import os, plistlib, zipfile
@@ -122,7 +142,7 @@ jobs:
       - name: Upload verified unsigned IPA
         uses: actions/upload-artifact@v4
         with:
-          name: BHTwitter-iOS26fix2_X-11.98_NeoFreeBird-icons_unsigned
+          name: BHTwitter-iOS26fix3_X-11.98_NeoFreeBird-icons_unsigned
           path: ${{ env.OUTPUT }}
           compression-level: 0
           if-no-files-found: error

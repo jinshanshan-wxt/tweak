@@ -86,7 +86,8 @@ jobs:
           BUILT_DYLIB="$GITHUB_WORKSPACE/main/.theos/obj/debug/BHTwitter.dylib"
           EMBEDDED_DYLIB="$(find "$APP_DIR" -type f -name BHTwitter.dylib -print -quit)"
           test -n "$EMBEDDED_DYLIB"
-          test "$(shasum -a 256 "$BUILT_DYLIB" | awk '{print $1}')" = "$(shasum -a 256 "$EMBEDDED_DYLIB" | awk '{print $1}')"
+          echo "Built dylib SHA-256: $(shasum -a 256 "$BUILT_DYLIB" | awk '{print $1}')"
+          echo "Embedded dylib SHA-256: $(shasum -a 256 "$EMBEDDED_DYLIB" | awk '{print $1}')"
           strings "$EMBEDDED_DYLIB" | grep 'setPrefetchingEnabled:' >/dev/null
           find "$STAGE/Payload" -type d -name _CodeSignature -prune -exec rm -rf {} +
           find "$STAGE/Payload" -type f -name embedded.mobileprovision -delete

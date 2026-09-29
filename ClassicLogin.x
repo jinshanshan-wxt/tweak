@@ -12,7 +12,10 @@ static BOOL NFBWebLoginEnabled(void) {
 %group NFBAccountLogin
 %hook T1AccountsViewController
 - (void)private_startLoginFlowWithSender:(id)sender {
-    if (!NFBWebLoginEnabled()) { %orig; return; }
+    if (!NFBWebLoginEnabled()) {
+        %orig;
+        return;
+    }
     [WebLoginViewController presentLoginFrom:(UIViewController *)self];
 }
 %end
@@ -21,7 +24,10 @@ static BOOL NFBWebLoginEnabled(void) {
 %group NFBInitialLogin1198
 %hook T1HostViewController
 - (void)makeOnboardingViewControllerWithOCFFallback:(id)fallback completion:(void (^)(id))completion {
-    if (!completion || !NFBWebLoginEnabled()) { %orig; return; }
+    if (!completion || !NFBWebLoginEnabled()) {
+        %orig;
+        return;
+    }
     completion([WebLoginViewController loginRootNavigationController]);
 }
 %end
@@ -30,7 +36,10 @@ static BOOL NFBWebLoginEnabled(void) {
 %group NFBInitialLoginNewer
 %hook T1HostViewController
 - (void)makeOnboardingViewControllerWithCompletion:(void (^)(id))completion {
-    if (!completion || !NFBWebLoginEnabled()) { %orig; return; }
+    if (!completion || !NFBWebLoginEnabled()) {
+        %orig;
+        return;
+    }
     completion([WebLoginViewController loginRootNavigationController]);
 }
 %end

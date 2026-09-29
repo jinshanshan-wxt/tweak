@@ -451,5 +451,3 @@
 "HIDE_NEWS_SIDEBAR_DETAIL" = "Hide the News entry in navigation. Restart the app after changing this setting.";
 "HIDE_JOBS_SIDEBAR_TITLE" = "Hide Jobs";
 "HIDE_JOBS_SIDEBAR_DETAIL" = "Hide the Jobs entry in navigation. Restart the app after changing this setting.";
-"DISABLE_LAUNCH_TRANSITION_TITLE" = "Disable launch transition";
-"DISABLE_LAUNCH_TRANSITION_DETAIL" = "Keep the classic blue bird screen but skip its fade when the app is ready. Restart to apply.";

@@ -13,7 +13,6 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / 'branding'))
 import ipa_branding
-from launch_asset import build_launch_asset, png_size
 
 
 def sha(path):
@@ -66,6 +65,7 @@ def main():
         shutil.copy2(built, embedded[0])
         bundle = ROOT / 'layout/Library/Application Support/BHT/BHTwitter.bundle'
         shutil.copytree(bundle, app / 'BHTwitter.bundle', dirs_exist_ok=True)
+        assert not (app / 'BHTwitter.bundle/NFBLaunchBird@3x.png').exists(), 'Removed overlay bitmap must not ship'
         # Newer-app launch NIBs are deliberately excluded: they are not 11.98 UI.
         safe_pack = work / 'safe-pack.zip'
         with zipfile.ZipFile(pack) as source, zipfile.ZipFile(safe_pack, 'w') as target:
@@ -76,10 +76,6 @@ def main():
         brand_work = work / 'branding'
         brand_work.mkdir()
         ipa_branding._apply_resource_pack_to_app(app, brand_work, safe_pack, keep_stock_icons=True)
-        # Render the exact pack glyph during CI, not on the cold-start UI thread.
-        launch_asset = build_launch_asset(safe_pack, app / 'BHTwitter.bundle',
-                                         ipa_branding._ensure_resvg(brand_work))
-        assert png_size(launch_asset.read_bytes()) == (228, 228)
         ipa_branding._set_display_name_in_app(app)
         info2 = plistlib.loads((app / 'Info.plist').read_bytes())
         # 11.98 also ships PNG-only alternates, without MSIS catalog facets.
@@ -137,9 +133,9 @@ def main():
             'settings_pages': 14,
             'missing_private_hooks_skipped': True,
             'incompatible_private_hook_abi_skipped': True,
-            'launch_transition_seconds': 0.18,
-            'launch_transition_style': 'bitmap-opacity-only-no-native-mask-no-zoom',
-            'launch_bitmap_pixels': list(png_size(launch_asset.read_bytes())),
+            'launch_transition_seconds': 0,
+            'launch_transition_style': 'none-system-static-launch-only',
+            'custom_launch_animation_removed': True,
             'sidebar_hidden_by_default': ['Money', 'News', 'Jobs'],
             'ios_26_plus_prefetch_workaround': True,
             'device_login_and_stability_tested': False,

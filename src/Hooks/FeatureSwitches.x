@@ -88,9 +88,10 @@ static NSNumber* FeatureSwitchOverrideValueForKey(NSString* key) {
         return @YES;
     }
 
-    // Restore the launch entry point; Launch.x owns the classic transition.
+    // Keep only the operating system's static launch screen. No custom fade,
+    // logo zoom or the native X reveal is enabled, including upgraded installs.
     if ([key isEqualToString:@"app_launch_animated_launch_screen_enabled"]) {
-        return @YES;
+        return @NO;
     }
 
     // Grok translations

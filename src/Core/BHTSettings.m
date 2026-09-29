@@ -386,16 +386,6 @@ static NSDictionary<NSString*, NSDictionary*>* BHTSettingsPages(void) {
                         @"key": @"color_twitter_icon_in_top_bar",
                         @"default": @([BHTManager isTwitterBranded]),
                         @"type": @"toggle"
-                    },
-                    @{
-                        @"key": @"blue_launch_screen",
-                        @"default": @([BHTManager isTwitterBranded]),
-                        @"type": @"toggle"
-                    },
-                    @{
-                        @"key": @"disable_launch_transition",
-                        @"default": @NO,
-                        @"type": @"toggle"
                     }
                 ]
             },
@@ -511,7 +501,6 @@ static NSDictionary<NSString*, NSDictionary*>* BHTSettingsIndex(void) {
         @"reply_sorting_enabled": @"reply_sorting",
         @"ios_in_app_article_webview_enabled": @"new_inapp_webview",
         @"tweet_url_host": @"sharing_domain",
-        @"nfb_classic_branding": @"blue_launch_screen",
     };
 
     // These old names double as Twitter's own feature-switch keys, so copy the

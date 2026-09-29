@@ -21,12 +21,12 @@ RuntimeCompatibility checks method existence AND argument/return ABI before
 every v7 Logos hook install, against a manifest generated from the declarations.
 The 11.98 font group and initial-login factory have explicit compatibility paths.
 Settings switches have one valid target; all pages share an implemented handler.
-The classic launch uses a 228x228 PNG compiled from the pinned pack during CI,
-not a cold-start vector render. It bypasses the original X-mask layout, hides
-the original launch subtree, and removes its layer animations/masks once.
-Only the overlay opacity fades for 0.18s; there is no 9x logo zoom or root-view
-group-opacity animation. Reduce Motion or the new disable-launch-transition
-setting skips the fade. Completion is idempotent, including window removal.
+The user rejected the substitute fade/zoom, which was not the classic Twitter
+bird-mask reveal. All custom launch overlays, bitmaps and transition code have
+been removed. The animated-launch feature gate is disabled unconditionally,
+regardless of preferences saved by prior builds. The operating system's static
+launch screen remains unchanged; an animated view created from cached native
+state finishes its host callback immediately, without running the X reveal.
 The pinned 11.98 native thunk was checked to accept a void(void) block.
 The native 11.98 launch NIB is intentionally retained, not replaced by a 12.x NIB.
 Startup no longer synchronously scans Documents/tmp or deletes arbitrary media.
@@ -35,7 +35,7 @@ Request rewriting applies only to accounts explicitly logged in through this
 flow, and only to enumerated HTTPS X/Twitter hosts. Sessions use device-local
 Keychain storage. Existing accounts are not migrated automatically.
 
-Settings: General -> Web login; Branding -> Blue launch screen.
+Settings: General -> Web login. The removed custom launch has no settings toggle.
 General also hides Money, News and Jobs by default, with individual toggles.
 Their feature gates are no longer forced on when hidden, and the sidebar's
 visible-panel snapshot claims the pinned 11.98 IDs (18/19/22), without changing the

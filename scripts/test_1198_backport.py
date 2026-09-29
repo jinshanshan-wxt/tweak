@@ -9,8 +9,6 @@ import tempfile
 import zipfile
 from pathlib import Path
 from hook_abi import render as render_abi
-from launch_asset import white_bird_svg
-import xml.etree.ElementTree as ET
 
 root = Path(__file__).resolve().parents[1]
 assert (root / 'src/Core/HookABI.h').read_text() == render_abi(), 'Hook ABI manifest is stale'
@@ -78,29 +76,24 @@ assert 'TAEStandardFontGroup' in (root / 'src/Core/BHTManager.m').read_text()
 assert 'NFBHookExistingMessage' in (root / 'src/Hooks/HookHelpers.h').read_text() + (root / 'src/Core/RuntimeCompatibility.h').read_text()
 assert '@interface DownloadInlineButton : NSObject' in (root / 'src/Download/DownloadInlineButton.h').read_text()
 launch = (root / 'src/Hooks/Launch.x').read_text()
-assert 'dispatch_once' in launch and 'NFBLaunchBird@3x.png' in launch
-assert '0.18' in launch and 'UIAccessibilityIsReduceMotionEnabled' in launch
-assert 'tfn_vectorImageNamed' not in launch and 'CGAffineTransformMakeScale' not in launch
-assert 'view.alpha = 0' not in launch and 'animateWithDuration' not in launch
-assert 'NFBClearLaunchLayers(view.layer)' in launch and 'subview.hidden = YES' in launch
-assert 'layer.mask = nil' in launch and 'allowsGroupOpacity = NO' in launch
-assert 'animationWithKeyPath:@"opacity"' in launch and 'disable_launch_transition' in launch
-layout_hook = launch.split('- (void)layoutSubviews {', 1)[1].split('- (void)animateReveal', 1)[0]
-assert layout_hook.count('%orig') == 1 and '%orig;\n        return;' in layout_hook
-assert 'NFBLaunchDoneKey, @YES' in launch and '[pending removeAllObjects]' in launch
-assert '!view.window && objc_getAssociatedObject(view, NFBLaunchPendingKey)' in launch
+assert launch.count('%hook') == 1 and launch.count('- (void)') == 1
+assert '((UIView *)self).hidden = YES' in launch
+assert 'if (completion) ((void (^)(void))completion)()' in launch
+assert all(token not in launch for token in ('%orig', 'layoutSubviews', 'didMoveToWindow',
+    'CABasicAnimation', 'CATransaction', 'animateWithDuration', 'UIImage', 'alloc',
+    'NFBLaunchOverlayKey', 'tfn_vectorImageNamed', 'CGAffineTransformMakeScale'))
+assert 'blue_launch_screen' not in registry and 'disable_launch_transition' not in registry
 switches = (root / 'src/Hooks/FeatureSwitches.x').read_text()
+assert re.search(r'if \(\[key isEqualToString:@"app_launch_animated_launch_screen_enabled"\]\) \{\s*return @NO;', switches)
+packager = (root / 'scripts/rebuild_1198.py').read_text()
+assert 'build_launch_asset' not in packager and 'none-system-static-launch-only' in packager
+assert not (root / 'scripts/launch_asset.py').exists()
 assert switches.index('NFBSidebarPreferenceForFeature(key)') < switches.index('@"ai_trends_ios_enable_news_tab"')
 assert 'return ![BHTSettings boolForKey:@"hide_money_sidebar"]' in switches
 assert 'return NFBSidebarClaimPanels(panelIDs, hidden)' in switches
 assert 'DashPanelIDQuery = saved' in switches and '@finally' in switches
 for key in ('hide_money_sidebar', 'hide_news_sidebar', 'hide_jobs_sidebar'):
     assert re.search(r'@"key": @"' + key + r'", @"default": @YES', registry)
-# Asset compilation preserves the existing glyph geometry, changes only color.
-sample = b'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M0 0h24v24z" fill="black"/><path d="M1 1" fill="none"/></svg>'
-white = ET.fromstring(white_bird_svg(sample))
-assert white.get('fill') == '#ffffff' and white[0].get('fill') == '#ffffff'
-assert white[0].get('d') == 'M0 0h24v24z' and white[1].get('fill') == 'none'
 assert 'animateRevealWithCompletion' not in (root / 'src/Hooks/AppLifecycle.x').read_text()
 assert '[BHTManager cleanCache]' not in (root / 'src/Hooks/AppLifecycle.x').read_text()
 assert 'tfn_vectorImageNamed' not in (root / 'src/Hooks/Theme.x').read_text()
@@ -138,4 +131,12 @@ with tempfile.TemporaryDirectory(prefix='nfb-runtime-test-') as temp:
                     '-I' + str(root / 'src'), str(root / 'src/Core/NFBSidebarPolicy.m'),
                     str(root / 'tests/sidebar_policy.m'), '-o', sidebar_executable], check=True)
     subprocess.run([sidebar_executable], check=True)
+    # Generate only a temporary include from the actual Logos method body.
+    launch_method = launch.split('%hook T1AnimatedLaunchScreenView\n', 1)[1].split('%end', 1)[0]
+    (Path(temp) / 'LaunchMethod.inc').write_text(launch_method, encoding='utf-8')
+    launch_executable = str(Path(temp) / 'launch-test')
+    subprocess.run(['xcrun', 'clang', '-fobjc-arc', '-framework', 'Foundation',
+                    '-I' + temp, str(root / 'tests/launch_no_animation.m'),
+                    '-o', launch_executable], check=True)
+    subprocess.run([launch_executable], check=True)
 print('PASS: 11.98 base, inherited switch actions, all v7 pages, launch and scoped login regression checks')

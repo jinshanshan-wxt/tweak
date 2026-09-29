@@ -50,7 +50,7 @@ def main():
         originals = {p.relative_to(app): sha(p) for p in app.rglob('*')
                      if is_macho(p) and p != embedded[0]}
         nibs = {p.relative_to(app): sha(p) for p in app.rglob('*')
-                if p.is_file() and (p.suffix == '.nib' or '.storyboardc' in p.parts)}
+                if p.is_file() and (p.suffix == '.nib' or any(part.endswith('.storyboardc') for part in p.parts))}
         built = work / 'BHTwitter.dylib'
         shutil.copy2(dylib, built)
         for line in otool(built).splitlines()[1:]:
@@ -58,7 +58,8 @@ def main():
             if dependency.startswith('/Library/Frameworks/'):
                 portable = '@rpath/' + dependency.removeprefix('/Library/Frameworks/')
                 subprocess.run(['install_name_tool', '-change', dependency, portable, str(built)], check=True)
-        assert '/Library/Frameworks/' not in otool(built)
+        dependencies = [line.strip().split(' ', 1)[0] for line in otool(built).splitlines()[1:]]
+        assert not any(path.startswith('/Library/Frameworks/') for path in dependencies), dependencies
         for name in ('Cephei', 'CepheiPrefs', 'CepheiUI', 'CydiaSubstrate'):
             assert (app / f'Frameworks/{name}.framework/{name}').is_file()
         shutil.copy2(built, embedded[0])

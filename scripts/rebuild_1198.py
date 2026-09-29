@@ -74,12 +74,15 @@ def main():
                     target.writestr(name, source.read(name))
         brand_work = work / 'branding'
         brand_work.mkdir()
-        ipa_branding._apply_resource_pack_to_app(app, brand_work, safe_pack)
+        ipa_branding._apply_resource_pack_to_app(app, brand_work, safe_pack, keep_stock_icons=True)
         ipa_branding._set_display_name_in_app(app)
         info2 = plistlib.loads((app / 'Info.plist').read_bytes())
         assert info2['CFBundleShortVersionString'] == '11.98'
         assert info2['CFBundleVersion'] == info['CFBundleVersion']
         assert info2['CFBundleIdentifier'] == info['CFBundleIdentifier']
+        old_icons = set(info['CFBundleIcons']['CFBundleAlternateIcons'])
+        new_icons = set(info2['CFBundleIcons']['CFBundleAlternateIcons'])
+        assert old_icons <= new_icons, f'Existing icons removed: {old_icons - new_icons}'
         assert info2.get('CADisableMinimumFrameDurationOnPhone') is True
         assert all(sha(app / p) == digest for p, digest in originals.items())
         assert all(sha(app / p) == digest for p, digest in nibs.items())
@@ -114,6 +117,7 @@ def main():
             'single_tweak_and_keychain_load': True,
             'promotion_opt_in': True,
             'alternate_icons': len(info2['CFBundleIcons']['CFBundleAlternateIcons']),
+            'all_existing_alternate_icons_preserved': old_icons <= new_icons,
             'provisioning_removed': True,
             'device_login_and_stability_tested': False,
         }

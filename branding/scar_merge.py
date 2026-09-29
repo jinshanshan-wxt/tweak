@@ -115,6 +115,8 @@ def main():
     ap.add_argument("out_car")
     ap.add_argument("--workdir", required=True)
     ap.add_argument("--scar", default=os.environ.get("NFB_SCAR", "scar"))
+    ap.add_argument("--keep-stock-icons", action="store_true",
+                    help="Keep existing alternate icons and their previews")
     args = ap.parse_args()
 
     catalog = os.path.join(args.workdir, "catalog")
@@ -223,7 +225,7 @@ def main():
     # 3. Drop stock alternates that got no replacement art, plus their
     #    -settings thumbnails, so the base app's icons don't linger in the
     #    picker alongside the pack's.
-    drop = {n for n in icon_names if n != primary and n not in themed}
+    drop = set() if args.keep_stock_icons else {n for n in icon_names if n != primary and n not in themed}
     drop |= {n for n in facets if settings_base(n) in drop and n not in themed}
     if drop:
         gone = {facets[n] for n in drop}

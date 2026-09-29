@@ -4,6 +4,8 @@ WebLoginViewController, WebSession (originally WebCreateTweet.x), WebXTID.js,
 and the branding scripts derive from orionblur/NeoFreeBird at
 1b24ee11908c9b3a1ec53938a4b5b085a56379f2 (AGPL-3.0, LICENSE in this directory).
 The classic resource pack is the upstream p63f20.zip, pinned by SHA-256 in CI.
+Unlike upstream's default packaging, all existing 11.98 alternate icons are
+retained, including icons absent from the new classic pack.
 
 Application base: the user's stable release 1.0, Twitter 11.98, SHA-256
 030bb98e1eb79b66884c83196ed9dd5ddae92719635fad5ba3e9f915a6767a8b.

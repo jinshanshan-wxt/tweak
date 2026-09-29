@@ -109,7 +109,7 @@ def _set_display_name_in_app(appdir):
 
 # --- resource pack ----------------------------------------------------------
 
-def _apply_resource_pack_to_app(appdir, workdir, zip_path):
+def _apply_resource_pack_to_app(appdir, workdir, zip_path, keep_stock_icons=False):
     """Overlay replacement images/glyphs from a zip onto the app.
 
     The pack is a .zip with two optional subfolders plus optional root files:
@@ -174,6 +174,7 @@ def _apply_resource_pack_to_app(appdir, workdir, zip_path):
             str(python), str(BRANDING_DIR / "scar_merge.py"),
             str(car), str(icons_dir), str(new_car),
             "--workdir", str(workdir), "--scar", str(scar),
+            *(["--keep-stock-icons"] if keep_stock_icons else []),
         ]):
             raise BrandingError("Branding: failed to rebuild Assets.car")
         shutil.copyfile(new_car, car)

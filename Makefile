@@ -13,7 +13,7 @@ BHTwitter_PRIVATE_FRAMEWORKS = Preferences
 BHTwitter_EXTRA_FRAMEWORKS = Cephei CepheiPrefs CepheiUI
 BHTwitter_OBJ_FILES = $(shell find lib -name '*.a')
 BHTwitter_LIBRARIES = sqlite3 bz2 c++ iconv z
-BHTwitter_CFLAGS = -Isrc -Iffmpeg -fobjc-arc -Wno-deprecated-declarations -Wno-nullability-completeness -Wno-unused-function -Wno-unused-property-ivar -Wno-error -DNFB_VERSION_STRING='"NeoFreeBird 11.98 iOS27"' -DNFB_COMMIT_STRING='"$(shell git rev-parse --short HEAD)"'
+BHTwitter_CFLAGS = -iquote src -Isrc -Iffmpeg -fobjc-arc -Wno-deprecated-declarations -Wno-nullability-completeness -Wno-unused-function -Wno-unused-property-ivar -Wno-error -DNFB_VERSION_STRING='"NeoFreeBird 11.98 iOS27"' -DNFB_COMMIT_STRING='"$(shell git rev-parse --short HEAD)"'
 
 include $(THEOS_MAKE_PATH)/tweak.mk
 

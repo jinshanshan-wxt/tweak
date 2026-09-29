@@ -59,7 +59,7 @@ jobs:
         working-directory: main
         env:
           THEOS: ${{ github.workspace }}/theos
-        run: make SIDELOADED=1
+        run: make -k SIDELOADED=1
       - name: Package and verify unsigned 11.98 IPA
         working-directory: main
         run: |

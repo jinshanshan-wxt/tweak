@@ -11,8 +11,8 @@
 //  fresh x-client-transaction-id. We never read the response body, only its status
 //  code, so response encoding (gzip) is irrelevant.
 //
-//  Gated on the inverse of `reply_in_webview`: when that setting is on, WebReply.x
-//  handles composing in a webview instead and this interception stays out of the way.
+//  This 11.98 backport only intercepts explicitly captured cookie-login accounts;
+//  native OAuth sessions and requests to unrelated hosts remain untouched.
 //
 
 #import "HookHelpers.h"
@@ -553,6 +553,7 @@ static void refreshXTIDForMethodPath(NSString* method, NSString* path) {
                                  inFrame:nil
                           inContentWorld:WKContentWorld.pageWorld
                        completionHandler:^(id result, __unused NSError* error) {
+                           if (webView != WebHelperWebView) return;
                            BOOL ok = [result isKindOfClass:[NSString class]] &&
                                      [(NSString*)result length] > 10 &&
                                      ![(NSString*)result hasPrefix:@"ERR:"];

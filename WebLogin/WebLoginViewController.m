@@ -73,6 +73,7 @@ static NSString* stringOrEmpty(NSString* value) { return value ?: @""; }
 #pragma mark - Presentation
 
 + (BOOL)isNativeBridgeAvailable {
+    @try {
     Class cls = NSClassFromString(@"TFNTwitterAccount");
     id twitter = performShared(NSClassFromString(@"TFNTwitter"), @selector(sharedTwitter));
     id service = performShared(twitter, @selector(accountService));
@@ -81,6 +82,9 @@ static NSString* stringOrEmpty(NSString* value) { return value ?: @""; }
            [cls instancesRespondToSelector:@selector(updateUserInfoAndCredentialsWithToken:secret:username:)] &&
            [service respondsToSelector:@selector(addAccount:)] &&
            [host respondsToSelector:@selector(viewAccount:animated:)];
+    } @catch (__unused NSException *exception) {
+        return NO;
+    }
 }
 
 + (BOOL)bht_isOurs:(UIViewController*)vc {
@@ -126,6 +130,9 @@ static NSString* stringOrEmpty(NSString* value) { return value ?: @""; }
 
     self.view.backgroundColor = [UIColor systemBackgroundColor];
     self.title = [[BHTBundle sharedBundle] localizedStringForKey:@"LOG_IN_TITLE"];
+    self.navigationItem.rightBarButtonItem = [[UIBarButtonItem alloc]
+        initWithTitle:[[BHTBundle sharedBundle] localizedStringForKey:@"NFB_NATIVE_LOGIN"]
+        style:UIBarButtonItemStylePlain target:self action:@selector(nativeLoginTapped)];
 
     if (!self.asRootScreen) {
         self.navigationItem.leftBarButtonItem =
@@ -161,6 +168,23 @@ static NSString* stringOrEmpty(NSString* value) { return value ?: @""; }
     [self.pollTimer invalidate];
     self.pollTimer = nil;
     [self dismissViewControllerAnimated:YES completion:nil];
+}
+
+- (void)nativeLoginTapped {
+    self.cancelled = YES;
+    [self.pollTimer invalidate];
+    self.pollTimer = nil;
+    [NSUserDefaults.standardUserDefaults setBool:NO forKey:@"nfb_web_login"];
+    [self.webView stopLoading];
+    if (!self.asRootScreen) {
+        [self dismissViewControllerAnimated:YES completion:nil];
+        return;
+    }
+    UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"已切回原生登录"
+        message:@"请从后台关闭并重新打开 Twitter，即可进入原生登录。此操作不会删除已有账号。"
+        preferredStyle:UIAlertControllerStyleAlert];
+    [alert addAction:[UIAlertAction actionWithTitle:@"确定" style:UIAlertActionStyleDefault handler:nil]];
+    [self presentViewController:alert animated:YES completion:nil];
 }
 
 #pragma mark - Navigation delegate
@@ -313,6 +337,7 @@ static NSString* stringOrEmpty(NSString* value) { return value ?: @""; }
     }
 
     long long uid = userID.longLongValue;
+    if (uid <= 0) return nil;
 
     // If this account is already in the store, reuse it instead of adding a second copy.
     // (webLoginDidCaptureCookies already refreshed its cached cookies just above.)
@@ -321,8 +346,13 @@ static NSString* stringOrEmpty(NSString* value) { return value ?: @""; }
         return existing;
     }
 
-    id account = ((id (*)(id, SEL, id, long long))objc_msgSend)(
-        [accountCls alloc], @selector(initWithUsername:userID:), username ?: @"", uid);
+    id account = nil;
+    @try {
+        account = ((id (*)(id, SEL, id, long long))objc_msgSend)(
+            [accountCls alloc], @selector(initWithUsername:userID:), username ?: userID, uid);
+    } @catch (__unused NSException *exception) {
+        return nil;
+    }
     if (!account) {
         return nil;
     }

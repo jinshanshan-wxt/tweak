@@ -444,3 +444,12 @@
 "NFB_WEB_LOGIN_TITLE" = "Use web login";
 "NFB_WEB_LOGIN_DETAIL" = "Use the official X web login. Disable to use the original login screen. Existing accounts are unchanged.";
 "NFB_NATIVE_LOGIN" = "Use original login";
+
+"HIDE_MONEY_SIDEBAR_TITLE" = "Hide Money";
+"HIDE_MONEY_SIDEBAR_DETAIL" = "Hide the Money entry in navigation. Restart the app after changing this setting.";
+"HIDE_NEWS_SIDEBAR_TITLE" = "Hide News";
+"HIDE_NEWS_SIDEBAR_DETAIL" = "Hide the News entry in navigation. Restart the app after changing this setting.";
+"HIDE_JOBS_SIDEBAR_TITLE" = "Hide Jobs";
+"HIDE_JOBS_SIDEBAR_DETAIL" = "Hide the Jobs entry in navigation. Restart the app after changing this setting.";
+"DISABLE_LAUNCH_TRANSITION_TITLE" = "Disable launch transition";
+"DISABLE_LAUNCH_TRANSITION_DETAIL" = "Keep the classic blue bird screen but skip its fade when the app is ready. Restart to apply.";

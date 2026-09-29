@@ -25,6 +25,9 @@ static NSDictionary<NSString*, NSDictionary*>* BHTSettingsPages(void) {
                       @"default": @YES},
                     @{@"key": @"hide_premium_offer",
                       @"default": @YES},
+                    @{@"key": @"hide_money_sidebar", @"default": @YES},
+                    @{@"key": @"hide_news_sidebar", @"default": @YES},
+                    @{@"key": @"hide_jobs_sidebar", @"default": @YES},
                     @{@"key": @"no_tab_bar_hiding",
                       @"default": @YES},
                     @{@"key": @"disable_rtl",
@@ -387,6 +390,11 @@ static NSDictionary<NSString*, NSDictionary*>* BHTSettingsPages(void) {
                     @{
                         @"key": @"blue_launch_screen",
                         @"default": @([BHTManager isTwitterBranded]),
+                        @"type": @"toggle"
+                    },
+                    @{
+                        @"key": @"disable_launch_transition",
+                        @"default": @NO,
                         @"type": @"toggle"
                     }
                 ]

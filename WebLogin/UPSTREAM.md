@@ -21,8 +21,13 @@ RuntimeCompatibility checks method existence AND argument/return ABI before
 every v7 Logos hook install, against a manifest generated from the declarations.
 The 11.98 font group and initial-login factory have explicit compatibility paths.
 Settings switches have one valid target; all pages share an implemented handler.
-The classic launch uses one cached glyph and a bounded 0.28s zoom/fade; it does
-not mutate all subview backgrounds during layout or run the original X mask.
+The classic launch uses a 228x228 PNG compiled from the pinned pack during CI,
+not a cold-start vector render. It bypasses the original X-mask layout, hides
+the original launch subtree, and removes its layer animations/masks once.
+Only the overlay opacity fades for 0.18s; there is no 9x logo zoom or root-view
+group-opacity animation. Reduce Motion or the new disable-launch-transition
+setting skips the fade. Completion is idempotent, including window removal.
+The pinned 11.98 native thunk was checked to accept a void(void) block.
 The native 11.98 launch NIB is intentionally retained, not replaced by a 12.x NIB.
 Startup no longer synchronously scans Documents/tmp or deletes arbitrary media.
 Web login is optional, uses an isolated WKWebView and the official X login site.
@@ -31,6 +36,14 @@ flow, and only to enumerated HTTPS X/Twitter hosts. Sessions use device-local
 Keychain storage. Existing accounts are not migrated automatically.
 
 Settings: General -> Web login; Branding -> Blue launch screen.
+General also hides Money, News and Jobs by default, with individual toggles.
+Their feature gates are no longer forced on when hidden, and the sidebar's
+visible-panel snapshot claims the pinned 11.98 IDs (18/19/22), without changing the
+actual tab array. Queries outside the drawer retain their original results.
+The newer upstream's IDs must NOT be used: 11.98 uses 14 for Community Notes,
+15 for Grok, 16 for Media, 17 for Premium, 18 for Jobs, 19 for Payments, 22 for
+News. These were verified against +[T1PanelIdentity stringForPanelID:] in the
+base framework, and regression checks audit its native string table directly.
 All 14 v7 categories are included, including Appearance, Grok, Timelines, Chat,
 Presets, Experimental and Debug. Controls for APIs absent from 11.98 cannot add
 native 12.x-only capabilities (such as XChat or newer Grok creation surfaces).

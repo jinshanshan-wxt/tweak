@@ -3,11 +3,14 @@
 import hashlib
 import plistlib
 import re
+import struct
 import subprocess
 import tempfile
 import zipfile
 from pathlib import Path
 from hook_abi import render as render_abi
+from launch_asset import white_bird_svg
+import xml.etree.ElementTree as ET
 
 root = Path(__file__).resolve().parents[1]
 assert (root / 'src/Core/HookABI.h').read_text() == render_abi(), 'Hook ABI manifest is stale'
@@ -22,6 +25,15 @@ with zipfile.ZipFile(root / 'packages/base-11.98-stable.ipa') as archive:
     info = plistlib.loads(archive.read('Payload/Twitter.app/Info.plist'))
     assert info['CFBundleShortVersionString'] == '11.98'
     binary = archive.read('Payload/Twitter.app/Frameworks/T1Twitter.framework/T1Twitter')
+    # Pinned base's +[T1PanelIdentity stringForPanelID:] indexes this CFString
+    # table. Catch accidental use of the newer upstream's different panel IDs.
+    for panel_id, panel_name in {14: '__PANEL_BIRDWATCH', 15: '__PANEL_GROK',
+                                 16: '__PANEL_Media', 17: '__PANEL_PREMIUMHUB',
+                                 18: '__PANEL_JOBS', 19: '__PANEL_PAYMENTS',
+                                 22: '__PANEL_NEWS'}.items():
+        cfstring = struct.unpack_from('<Q', binary, 0x18ac3b0 + (panel_id - 1) * 8)[0] & 0xffffffff
+        string_addr = struct.unpack_from('<Q', binary, cfstring + 16)[0] & 0xffffffff
+        assert binary[string_addr:binary.index(b'\0', string_addr)].decode() == panel_name
     for selector in ('initWithUsername:userID:', 'updateUserInfoAndCredentialsWithToken:secret:username:',
                      'private_startLoginFlowWithSender:', 'makeOnboardingViewControllerWithOCFFallback:completion:',
                      'viewAccount:animated:', 'addAccount:', 'saveSharedTwitter', 'animateRevealWithCompletion:'):
@@ -66,8 +78,29 @@ assert 'TAEStandardFontGroup' in (root / 'src/Core/BHTManager.m').read_text()
 assert 'NFBHookExistingMessage' in (root / 'src/Hooks/HookHelpers.h').read_text() + (root / 'src/Core/RuntimeCompatibility.h').read_text()
 assert '@interface DownloadInlineButton : NSObject' in (root / 'src/Download/DownloadInlineButton.h').read_text()
 launch = (root / 'src/Hooks/Launch.x').read_text()
-assert 'layoutSubviews' not in launch and 'dispatch_once' in launch
-assert '0.28' in launch and 'UIAccessibilityIsReduceMotionEnabled' in launch
+assert 'dispatch_once' in launch and 'NFBLaunchBird@3x.png' in launch
+assert '0.18' in launch and 'UIAccessibilityIsReduceMotionEnabled' in launch
+assert 'tfn_vectorImageNamed' not in launch and 'CGAffineTransformMakeScale' not in launch
+assert 'view.alpha = 0' not in launch and 'animateWithDuration' not in launch
+assert 'NFBClearLaunchLayers(view.layer)' in launch and 'subview.hidden = YES' in launch
+assert 'layer.mask = nil' in launch and 'allowsGroupOpacity = NO' in launch
+assert 'animationWithKeyPath:@"opacity"' in launch and 'disable_launch_transition' in launch
+layout_hook = launch.split('- (void)layoutSubviews {', 1)[1].split('- (void)animateReveal', 1)[0]
+assert layout_hook.count('%orig') == 1 and '%orig;\n        return;' in layout_hook
+assert 'NFBLaunchDoneKey, @YES' in launch and '[pending removeAllObjects]' in launch
+assert '!view.window && objc_getAssociatedObject(view, NFBLaunchPendingKey)' in launch
+switches = (root / 'src/Hooks/FeatureSwitches.x').read_text()
+assert switches.index('NFBSidebarPreferenceForFeature(key)') < switches.index('@"ai_trends_ios_enable_news_tab"')
+assert 'return ![BHTSettings boolForKey:@"hide_money_sidebar"]' in switches
+assert 'return NFBSidebarClaimPanels(panelIDs, hidden)' in switches
+assert 'DashPanelIDQuery = saved' in switches and '@finally' in switches
+for key in ('hide_money_sidebar', 'hide_news_sidebar', 'hide_jobs_sidebar'):
+    assert re.search(r'@"key": @"' + key + r'", @"default": @YES', registry)
+# Asset compilation preserves the existing glyph geometry, changes only color.
+sample = b'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M0 0h24v24z" fill="black"/><path d="M1 1" fill="none"/></svg>'
+white = ET.fromstring(white_bird_svg(sample))
+assert white.get('fill') == '#ffffff' and white[0].get('fill') == '#ffffff'
+assert white[0].get('d') == 'M0 0h24v24z' and white[1].get('fill') == 'none'
 assert 'animateRevealWithCompletion' not in (root / 'src/Hooks/AppLifecycle.x').read_text()
 assert '[BHTManager cleanCache]' not in (root / 'src/Hooks/AppLifecycle.x').read_text()
 assert 'tfn_vectorImageNamed' not in (root / 'src/Hooks/Theme.x').read_text()
@@ -100,4 +133,9 @@ with tempfile.TemporaryDirectory(prefix='nfb-runtime-test-') as temp:
                     str(root / 'src/Core/RuntimeCompatibility.m'),
                     str(root / 'tests/runtime_compatibility.m'), '-o', executable], check=True)
     subprocess.run([executable], check=True)
+    sidebar_executable = str(Path(temp) / 'sidebar-test')
+    subprocess.run(['xcrun', 'clang', '-fobjc-arc', '-framework', 'Foundation',
+                    '-I' + str(root / 'src'), str(root / 'src/Core/NFBSidebarPolicy.m'),
+                    str(root / 'tests/sidebar_policy.m'), '-o', sidebar_executable], check=True)
+    subprocess.run([sidebar_executable], check=True)
 print('PASS: 11.98 base, inherited switch actions, all v7 pages, launch and scoped login regression checks')

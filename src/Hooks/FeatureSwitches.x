@@ -4,6 +4,7 @@
 //
 
 #import "HookHelpers.h"
+#import "Core/NFBSidebarPolicy.h"
 
 // While set, -isSubscribedTo: (below) reports the account's genuine
 // subscription state instead of the forced premium tiers, so paths that need
@@ -40,6 +41,12 @@ static BOOL AccountIsGenuinelyPremium(void) {
 static NSNumber* FeatureSwitchOverrideValueForKey(NSString* key) {
     if (![key isKindOfClass:[NSString class]]) {
         return nil;
+    }
+
+    // Respect hidden entries before the upstream forced navigation unlocks.
+    NSString *sidebarPreference = NFBSidebarPreferenceForFeature(key);
+    if (!ReportGenuineTabGates && sidebarPreference && [BHTSettings boolForKey:sidebarPreference]) {
+        return @NO;
     }
 
     // Custom timelines overrides
@@ -247,7 +254,7 @@ static NSNumber* FeatureSwitchOverrideValueForKey(NSString* key) {
              @"home_timeline_foreground_refresh_min_background_seconds"]) 
     {return [BHTSettings boolForKey:@"no_focus_lost"] ? @(315360000.0) : nil;}
 
-    // Communities, Spaces, News and Grok are enabled outright for every account.
+    // Optional News respects the sidebar preference checked above.
     if ([key isEqualToString:@"ai_trends_ios_enable_news_tab"] ||
         [key isEqualToString:@"voice_rooms_consumption_enabled"] ||
         [key isEqualToString:@"communities_enable_explore_tab"] ||
@@ -647,7 +654,7 @@ static NSNumber* FeatureSwitchOverrideValueForKey(NSString* key) {
     if (ReportGenuineTabGates) {
         return %orig;
     }
-    return YES;
+    return ![BHTSettings boolForKey:@"hide_money_sidebar"];
 }
 
 %end
@@ -752,18 +759,18 @@ static BOOL genuineSwitchBool(NSString* key) {
 
 BOOL panelIsGenuinelyAvailable(long long panelID) {
     switch (panelID) {
-        case 13: { // Community Notes
+        case 14: { // Community Notes (11.98 __PANEL_BIRDWATCH)
             id switches = accountFeatureSwitches();
             return genuineTabGateFlag(switches,
                                       @selector(birdwatchHomePageIsEnabled)) &&
                    genuineTabGateFlag(switches, @selector(birdwatchHistoryIsEnabled));
         }
-        case 15: // Premium hub
+        case 17: // Premium hub
             return genuineSwitchBool(@"subscriptions_premium_hub_enabled");
-        case 16: // Jobs
+        case 18: // Jobs
             return genuineSwitchBool(@"recruiting_global_jobs_hub_enabled") ||
                    genuineSwitchBool(@"recruiting_jetfuel_jobs_hub_enabled");
-        case 17: { // Money
+        case 19: { // Money
             id host =
                 ((id (*)(id, SEL))objc_msgSend)(objc_getClass("T1HostViewController"),
                                                 @selector(sharedHostViewController));
@@ -789,9 +796,13 @@ static __thread BOOL DashPanelIDQuery = NO;
 %hook T1DashContentController
 
 - (void)updateVisiblePanelIDs {
+    BOOL saved = DashPanelIDQuery;
     DashPanelIDQuery = YES;
-    %orig;
-    DashPanelIDQuery = NO;
+    @try {
+        %orig;
+    } @finally {
+        DashPanelIDQuery = saved;
+    }
 }
 
 %end
@@ -804,29 +815,31 @@ static __thread BOOL DashPanelIDQuery = NO;
         return panelIDs;
     }
 
-    NSMutableArray* spoofed = [panelIDs mutableCopy];
+    NSMutableArray* hidden = [NSMutableArray array];
     void (^claim)(NSNumber*) = ^(NSNumber* panelID) {
-        if (![spoofed containsObject:panelID]) {
-            [spoofed addObject:panelID];
+        if (![hidden containsObject:panelID]) {
+            [hidden addObject:panelID];
         }
     };
 
-    for (NSNumber* panelID in @[@13, @15, @16, @17]) {
+    for (NSNumber* panelID in @[@14, @17, @18, @19]) {
         if (!panelIsGenuinelyAvailable(panelID.longLongValue)) {
             claim(panelID);
         }
     }
 
     if ([BHTSettings boolForKey:@"hide_grok_sidebar"]) {
-        claim(@14);
+        claim(@15);
     }
 
     if (!AccountIsGenuinelyPremium()) {
-        claim(@15);
+        claim(@17);
     }
-    claim(@20); // News
+    for (NSNumber *panelID in @[@18, @19, @22]) {
+        if ([BHTSettings boolForKey:NFBSidebarPreferenceForPanel(panelID.longLongValue)]) claim(panelID);
+    }
 
-    return spoofed;
+    return NFBSidebarClaimPanels(panelIDs, hidden);
 }
 
 %end

@@ -446,5 +446,14 @@
 "NFB_WEB_LOGIN_TITLE" = "使用网页登录";
 "NFB_WEB_LOGIN_DETAIL" = "使用 X 官方网页登录。关闭后使用原有登录界面，不会改动已登录的账号。";
 "NFB_NATIVE_LOGIN" = "使用原有登录";
+
+"HIDE_MONEY_SIDEBAR_TITLE" = "隐藏 Money 入口";
+"HIDE_MONEY_SIDEBAR_DETAIL" = "隐藏导航中的 Money 入口。修改后请重新启动应用。";
+"HIDE_NEWS_SIDEBAR_TITLE" = "隐藏 News 入口";
+"HIDE_NEWS_SIDEBAR_DETAIL" = "隐藏导航中的 News 入口。修改后请重新启动应用。";
+"HIDE_JOBS_SIDEBAR_TITLE" = "隐藏职位入口";
+"HIDE_JOBS_SIDEBAR_DETAIL" = "隐藏导航中的职位入口。修改后请重新启动应用。";
+"DISABLE_LAUNCH_TRANSITION_TITLE" = "关闭启动过渡动画";
+"DISABLE_LAUNCH_TRANSITION_DETAIL" = "保留经典蓝色小鸟画面，应用就绪后直接进入主页，不播放淡出动画。重新启动后生效。";
 "HIDE_MESSAGE_BUTTON_TITLE" = "隐藏推文上的私信按钮";
 "HIDE_MESSAGE_BUTTON_DETAIL" = "隐藏推文作者栏中的私信按钮，不影响正常收发私信。";

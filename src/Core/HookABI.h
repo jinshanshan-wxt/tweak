@@ -29,6 +29,7 @@ static const NFBHookABI NFBHookABIs[] = {
     {"T1AccountsViewController", "private_startLoginFlowWithSender:", "v", NO, 1, {"@"}},
     {"T1AnimatedLaunchScreenView", "animateRevealWithCompletion:", "v", NO, 1, {"@"}},
     {"T1AnimatedLaunchScreenView", "didMoveToWindow", "v", NO, 0, {NULL}},
+    {"T1AnimatedLaunchScreenView", "layoutSubviews", "v", NO, 0, {NULL}},
     {"T1AppDelegate", "application:didFinishLaunchingWithOptions:", "boolean", NO, 2, {"@", "@"}},
     {"T1AppDelegate", "applicationDidBecomeActive:", "v", NO, 1, {"@"}},
     {"T1AppDelegate", "applicationWillResignActive:", "v", NO, 1, {"@"}},

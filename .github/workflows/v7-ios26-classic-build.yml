@@ -173,8 +173,10 @@ jobs:
               assert not any(name.endswith("/embedded.mobileprovision") for name in names)
           print("Verified unsigned IPA:", os.path.getsize(output), "bytes")
           PY
-          unzip -p "$OUTPUT" 'Payload/*.app/BHTwitter.dylib' | strings | grep 'setPrefetchingEnabled:' >/dev/null
-          unzip -p "$OUTPUT" 'Payload/*.app/BHTwitter.dylib' | strings | grep 'restore_twitter_names' >/dev/null
+          DYLIB_PATH="$(unzip -Z1 "$OUTPUT" | grep '/BHTwitter.dylib$' | head -n1)"
+          test -n "$DYLIB_PATH"
+          unzip -p "$OUTPUT" "$DYLIB_PATH" | strings | grep 'setPrefetchingEnabled:' >/dev/null
+          unzip -p "$OUTPUT" "$DYLIB_PATH" | strings | grep 'restore_twitter_names' >/dev/null
           echo "IPA SHA-256: $(shasum -a 256 "$OUTPUT" | awk '{print $1}')" >> "$GITHUB_STEP_SUMMARY"
 
       - name: Upload unsigned IPA

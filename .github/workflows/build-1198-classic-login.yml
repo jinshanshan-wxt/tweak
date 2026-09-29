@@ -1,4 +1,4 @@
-name: Build Twitter 11.98 Classic Bird and Web Login
+name: Build Twitter 11.98 NeoFreeBird v7 iOS27
 
 on:
   workflow_dispatch:
@@ -55,7 +55,7 @@ jobs:
           echo '030bb98e1eb79b66884c83196ed9dd5ddae92719635fad5ba3e9f915a6767a8b  packages/base-11.98-stable.ipa' | shasum -a 256 -c -
           echo 'd597b509fe0eef730949f698d6818794d795062703697c53388e2edc1c9d29e2  packages/classic-resource-pack.zip' | shasum -a 256 -c -
           python3 scripts/test_1198_backport.py
-      - name: Compile selective 11.98 backport
+      - name: Compile full v7 with guarded 11.98 hooks
         working-directory: main
         env:
           THEOS: ${{ github.workspace }}/theos
@@ -66,14 +66,14 @@ jobs:
           python3 scripts/rebuild_1198.py packages/base-11.98-stable.ipa packages/classic-resource-pack.zip .theos/obj/debug/BHTwitter.dylib
           echo "Source commit: $(git rev-parse HEAD)" >> "$GITHUB_STEP_SUMMARY"
           echo 'Base: user stable Twitter 11.98 (not 12.x)' >> "$GITHUB_STEP_SUMMARY"
-          echo 'Selective classic branding and optional web login; stable iOS 26 hooks preserved.' >> "$GITHUB_STEP_SUMMARY"
+          echo 'Full v7 settings and hooks, guarded for 11.98; iOS 26+ prefetch workaround retained; one-shot classic launch.' >> "$GITHUB_STEP_SUMMARY"
           cat packages/verification.json >> "$GITHUB_STEP_SUMMARY"
       - name: Upload unsigned IPA and verification
         uses: actions/upload-artifact@v4
         with:
-          name: Twitter-11.98_ClassicBird_WebLogin_iOS26_zh-CN_unsigned
+          name: Twitter-11.98_NeoFreeBird-v7_iOS27_zh-CN_unsigned
           path: |
-            main/packages/Twitter-11.98_ClassicBird_WebLogin_iOS26_zh-CN_unsigned.ipa
+            main/packages/Twitter-11.98_NeoFreeBird-v7_iOS27_zh-CN_unsigned.ipa
             main/packages/verification.json
           compression-level: 0
           retention-days: 30

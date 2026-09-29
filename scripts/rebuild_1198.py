@@ -32,7 +32,7 @@ def is_macho(path):
 
 def main():
     base, pack, dylib = map(lambda arg: Path(arg).resolve(), sys.argv[1:4])
-    output = ROOT / 'packages/Twitter-11.98_ClassicBird_WebLogin_iOS26_zh-CN_unsigned.ipa'
+    output = ROOT / 'packages/Twitter-11.98_NeoFreeBird-v7_iOS27_zh-CN_unsigned.ipa'
     with tempfile.TemporaryDirectory(prefix='nfb-1198-') as temp:
         work = Path(temp)
         stage = work / 'stage'
@@ -108,7 +108,7 @@ def main():
                 matches = list(app.rglob(glyph))
                 assert matches and all(p.read_bytes() == expected for p in matches), glyph
         strings = (app / 'BHTwitter.bundle/zh_CN.lproj/Localizable.strings').read_text('utf-8')
-        assert '使用网页登录' in strings and '搜索与发现' in strings
+        assert all(title in strings for title in ('使用网页登录', '搜索与发现', 'Grok', '时间线', '外观', '实验室'))
         assert (app / 'BHTwitter.bundle/WebXTID.js').is_file()
         for seal in sorted((stage / 'Payload').rglob('_CodeSignature'), reverse=True):
             if seal.is_dir():
@@ -128,6 +128,11 @@ def main():
             'alternate_icons': len(info2['CFBundleIcons']['CFBundleAlternateIcons']),
             'all_existing_alternate_icons_preserved': old_icons <= new_icons,
             'provisioning_removed': True,
+            'settings_core': 'orionblur-v7-1b24ee11908c',
+            'settings_pages': 14,
+            'missing_private_hooks_skipped': True,
+            'launch_transition_seconds': 0.28,
+            'ios_26_plus_prefetch_workaround': True,
             'device_login_and_stability_tested': False,
         }
         (ROOT / 'packages/verification.json').write_text(json.dumps(report, indent=2) + '\n', encoding='utf-8')

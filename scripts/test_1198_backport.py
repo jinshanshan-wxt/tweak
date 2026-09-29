@@ -7,10 +7,15 @@ import zipfile
 from pathlib import Path
 
 root = Path(__file__).resolve().parents[1]
-stable = 'a2201724a9584482cd2cf7c66baaf18ee5df12c8'
-for filename in ('Tweak.x', 'IOS26Compatibility.x', 'BHDownloadInlineButton.m', 'keychainfix/Tweak.x'):
-    original = subprocess.check_output(['git', 'show', f'{stable}:{filename}'], cwd=root)
-    assert (root / filename).read_bytes() == original, f'Stable crash fix modified: {filename}'
+# File hashes from stable a220172; works with the CI shallow checkout as well.
+stable_hashes = {
+    'Tweak.x': 'bc4b8c8f3f6499ac974d1e5fc10b04fab9cd02ddf4b32804cf7983738e5b35b8',
+    'IOS26Compatibility.x': '1516732042a974aee12227d045c678cef4c4b715f95ada2ee2c3f1fbb813f971',
+    'BHDownloadInlineButton.m': '621fc1801175dea282b3e5cdd74a336f06a9a329d5dcbdf02170ce3e45725c8e',
+    'keychainfix/Tweak.x': '83c4864bbfd1243135d5bae25a023d381c83bbaaef0a3fd13ec95e313c792bb1',
+}
+for filename, expected in stable_hashes.items():
+    assert hashlib.sha256((root / filename).read_bytes()).hexdigest() == expected, f'Stable crash fix modified: {filename}'
 with zipfile.ZipFile(root / 'packages/base-11.98-stable.ipa') as archive:
     info = plistlib.loads(archive.read('Payload/Twitter.app/Info.plist'))
     assert info['CFBundleShortVersionString'] == '11.98'

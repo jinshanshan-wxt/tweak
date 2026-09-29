@@ -1,4 +1,5 @@
 #import "HookHelpers.h"
+#import <QuartzCore/QuartzCore.h>
 
 // The 11.98 native layout creates an X-shaped reveal mask. Own the classic
 // layout instead: a small build-time PNG, no zoom and no native reveal subtree.

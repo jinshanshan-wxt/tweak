@@ -184,7 +184,7 @@
 }
 - (void)didMoveToWindow {
     %orig;
-    if ([BHTSettings boolForKey:@"hide_follow_button"] &&
+    if ([BHTSettings boolForKey:@"hide_message_button"] &&
         [self respondsToSelector:@selector(messageButton)]) {
         self.messageButton.hidden = YES;
         self.messageButton.userInteractionEnabled = NO;

@@ -78,6 +78,14 @@ bundle = root / 'layout/Library/Application Support/BHT/BHTwitter.bundle'
 for source in bundle.rglob('*.strings'):
     subprocess.run(['plutil', '-lint', str(source)], check=True, stdout=subprocess.DEVNULL)
 zh = (bundle / 'zh_CN.lproj/Localizable.strings').read_text('utf-8')
+localized_keys = set(re.findall(r'^"([^"]+)"\s*=', zh, re.M))
+for setting in re.findall(r'@\{([^{}]+)\}', registry, re.S):
+    pref = re.search(r'@"key":\s*@"([^"]+)"', setting)
+    if not pref:
+        continue
+    explicit = re.search(r'@"titleKey":\s*@"([^"]+)"', setting)
+    title_key = explicit[1] if explicit else pref[1].upper() + '_TITLE'
+    assert title_key in localized_keys, f'Untranslated setting: {title_key}'
 ''.join(c for c in zh if '\u3400' <= c <= '\u9fff' or '\u3000' <= c <= '\u303f').encode('gbk', errors='strict')
 for title in ('使用网页登录', '搜索与发现', '时间线', '外观', '实验室', 'Grok'):
     assert title in zh

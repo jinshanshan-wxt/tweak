@@ -66,7 +66,7 @@ jobs:
           python3 scripts/rebuild_1198.py packages/base-11.98-stable.ipa packages/classic-resource-pack.zip .theos/obj/debug/BHTwitter.dylib
           echo "Source commit: $(git rev-parse HEAD)" >> "$GITHUB_STEP_SUMMARY"
           echo 'Base: user stable Twitter 11.98 (not 12.x)' >> "$GITHUB_STEP_SUMMARY"
-          echo 'Full v7 settings and guarded 11.98 hooks; custom launch animation removed; Money/News/Jobs hidden by default.' >> "$GITHUB_STEP_SUMMARY"
+          echo 'Full v7 settings and guarded 11.98 hooks; classic three-layer bird-mask reveal; Money/News/Jobs hidden by default.' >> "$GITHUB_STEP_SUMMARY"
           cat packages/verification.json >> "$GITHUB_STEP_SUMMARY"
       - name: Upload unsigned IPA and verification
         uses: actions/upload-artifact@v4

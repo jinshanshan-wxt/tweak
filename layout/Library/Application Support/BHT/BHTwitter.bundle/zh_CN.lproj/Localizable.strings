@@ -455,3 +455,6 @@
 "HIDE_JOBS_SIDEBAR_DETAIL" = "隐藏导航中的职位入口。修改后请重新启动应用。";
 "HIDE_MESSAGE_BUTTON_TITLE" = "隐藏推文上的私信按钮";
 "HIDE_MESSAGE_BUTTON_DETAIL" = "隐藏推文作者栏中的私信按钮，不影响正常收发私信。";
+
+"CLASSIC_LAUNCH_ANIMATION_TITLE" = "经典启动动画";
+"CLASSIC_LAUNCH_ANIMATION_DETAIL" = "小蓝鸟先轻微缩小，再通过鸟形遮罩展开主页。修改后请重新启动应用；系统开启“减弱动态效果”时不播放。";

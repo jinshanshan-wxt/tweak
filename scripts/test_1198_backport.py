@@ -5,12 +5,16 @@ import plistlib
 import re
 import struct
 import subprocess
+import sys
 import tempfile
 import zipfile
 from pathlib import Path
 from hook_abi import render as render_abi
 
 root = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(root / 'branding'))
+import ipa_branding
+from launch_asset import build_launch_asset
 assert (root / 'src/Core/HookABI.h').read_text() == render_abi(), 'Hook ABI manifest is stale'
 assert hashlib.sha256((root / 'keychainfix/Tweak.x').read_bytes()).hexdigest() == '83c4864bbfd1243135d5bae25a023d381c83bbaaef0a3fd13ec95e313c792bb1'
 assert hashlib.sha256((root / 'IOS26Compatibility.x').read_bytes()).hexdigest() == '1516732042a974aee12227d045c678cef4c4b715f95ada2ee2c3f1fbb813f971'
@@ -76,18 +80,33 @@ assert 'TAEStandardFontGroup' in (root / 'src/Core/BHTManager.m').read_text()
 assert 'NFBHookExistingMessage' in (root / 'src/Hooks/HookHelpers.h').read_text() + (root / 'src/Core/RuntimeCompatibility.h').read_text()
 assert '@interface DownloadInlineButton : NSObject' in (root / 'src/Download/DownloadInlineButton.h').read_text()
 launch = (root / 'src/Hooks/Launch.x').read_text()
-assert launch.count('%hook') == 1 and launch.count('- (void)') == 1
+assert launch.count('%hook') == 1 and launch.count('- (void)') == 3
 assert '((UIView *)self).hidden = YES' in launch
 assert 'if (completion) ((void (^)(void))completion)()' in launch
-assert all(token not in launch for token in ('%orig', 'layoutSubviews', 'didMoveToWindow',
-    'CABasicAnimation', 'CATransaction', 'animateWithDuration', 'UIImage', 'alloc',
-    'NFBLaunchOverlayKey', 'tfn_vectorImageNamed', 'CGAffineTransformMakeScale'))
+assert '%orig' not in launch.split('- (void)animateRevealWithCompletion:', 1)[1]
+assert 'NFBLaunchMask.png' in launch and 'UIAccessibilityIsReduceMotionEnabled()' in launch
+assert '![BHTSettings boolForKey:@"padlock"]' in launch, 'Do not snapshot private content behind the app lock'
+composition = (root / 'src/Launch/NFBLaunchComposition.m').read_text()
+assert 'masked.mask = _maskLayer' in composition
+assert 'masked.backgroundColor = white' in composition and 'root.backgroundColor = blue' in composition
+assert 'CAKeyframeAnimation' in composition and 'NFBLaunchProgress(t)' in composition
+assert 'CAFrameRateRangeMake' in composition
+assert all(token not in composition for token in ('CADisplayLink', 'NSTimer', 'animateWithDuration'))
+session = (root / 'src/Launch/NFBClassicLaunchSession.m').read_text()
+assert 'maximumFramesPerSecond' in session
+assert session.count('snapshotViewAfterScreenUpdates:YES') == 1
+assert '[_window addSubview:_cover]' in session
+assert 'root.layer.mask =' not in session and 'root.transform =' not in session
+assert 'UIApplicationWillResignActiveNotification' in session
+assert 'UIAccessibilityReduceMotionStatusDidChangeNotification' in session
+assert '_finishing = YES' in session and '[weakSelf finish]' in session
+assert session.index('[_cover removeFromSuperview]') < session.index('[_completion finish]')
+assert re.search(r'@"key": @"classic_launch_animation",\s*@"default": @YES', registry)
 assert 'blue_launch_screen' not in registry and 'disable_launch_transition' not in registry
 switches = (root / 'src/Hooks/FeatureSwitches.x').read_text()
-assert re.search(r'if \(\[key isEqualToString:@"app_launch_animated_launch_screen_enabled"\]\) \{\s*return @NO;', switches)
+assert re.search(r'if \(\[key isEqualToString:@"app_launch_animated_launch_screen_enabled"\]\) \{\s*return @\(\[BHTSettings boolForKey:@"classic_launch_animation"\]\);', switches)
 packager = (root / 'scripts/rebuild_1198.py').read_text()
-assert 'build_launch_asset' not in packager and 'none-system-static-launch-only' in packager
-assert not (root / 'scripts/launch_asset.py').exists()
+assert 'build_launch_asset' in packager and 'classic-bird-mask-reveal-three-layers' in packager
 assert switches.index('NFBSidebarPreferenceForFeature(key)') < switches.index('@"ai_trends_ios_enable_news_tab"')
 assert 'return ![BHTSettings boolForKey:@"hide_money_sidebar"]' in switches
 assert 'return NFBSidebarClaimPanels(panelIDs, hidden)' in switches
@@ -131,12 +150,13 @@ with tempfile.TemporaryDirectory(prefix='nfb-runtime-test-') as temp:
                     '-I' + str(root / 'src'), str(root / 'src/Core/NFBSidebarPolicy.m'),
                     str(root / 'tests/sidebar_policy.m'), '-o', sidebar_executable], check=True)
     subprocess.run([sidebar_executable], check=True)
-    # Generate only a temporary include from the actual Logos method body.
-    launch_method = launch.split('%hook T1AnimatedLaunchScreenView\n', 1)[1].split('%end', 1)[0]
-    (Path(temp) / 'LaunchMethod.inc').write_text(launch_method, encoding='utf-8')
+    mask = build_launch_asset(root / 'packages/classic-resource-pack.zip', Path(temp),
+                              ipa_branding._ensure_resvg(Path(temp)))
     launch_executable = str(Path(temp) / 'launch-test')
     subprocess.run(['xcrun', 'clang', '-fobjc-arc', '-framework', 'Foundation',
-                    '-I' + temp, str(root / 'tests/launch_no_animation.m'),
+                    '-framework', 'QuartzCore', '-framework', 'CoreGraphics', '-framework', 'ImageIO',
+                    '-I' + str(root / 'src'), str(root / 'src/Launch/NFBLaunchComposition.m'),
+                    str(root / 'tests/launch_composition.m'),
                     '-o', launch_executable], check=True)
-    subprocess.run([launch_executable], check=True)
+    subprocess.run([launch_executable, str(mask)], check=True)
 print('PASS: 11.98 base, inherited switch actions, all v7 pages, launch and scoped login regression checks')

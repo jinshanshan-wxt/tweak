@@ -88,10 +88,10 @@ static NSNumber* FeatureSwitchOverrideValueForKey(NSString* key) {
         return @YES;
     }
 
-    // Keep only the operating system's static launch screen. No custom fade,
-    // logo zoom or the native X reveal is enabled, including upgraded installs.
+    // Opt into the host's ready callback; Launch.x supplies the classic bird
+    // mask reveal instead of invoking the native X animation.
     if ([key isEqualToString:@"app_launch_animated_launch_screen_enabled"]) {
-        return @NO;
+        return @([BHTSettings boolForKey:@"classic_launch_animation"]);
     }
 
     // Grok translations

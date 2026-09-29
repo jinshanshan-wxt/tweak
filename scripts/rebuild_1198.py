@@ -13,6 +13,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / 'branding'))
 import ipa_branding
+from launch_asset import build_launch_asset
 
 
 def sha(path):
@@ -76,6 +77,7 @@ def main():
         brand_work = work / 'branding'
         brand_work.mkdir()
         ipa_branding._apply_resource_pack_to_app(app, brand_work, safe_pack, keep_stock_icons=True)
+        build_launch_asset(safe_pack, app / 'BHTwitter.bundle', ipa_branding._ensure_resvg(brand_work))
         ipa_branding._set_display_name_in_app(app)
         info2 = plistlib.loads((app / 'Info.plist').read_bytes())
         # 11.98 also ships PNG-only alternates, without MSIS catalog facets.
@@ -133,9 +135,13 @@ def main():
             'settings_pages': 14,
             'missing_private_hooks_skipped': True,
             'incompatible_private_hook_abi_skipped': True,
-            'launch_transition_seconds': 0,
-            'launch_transition_style': 'none-system-static-launch-only',
-            'custom_launch_animation_removed': True,
+            'launch_transition_seconds': 1.0,
+            'launch_transition_style': 'classic-bird-mask-reveal-three-layers',
+            'launch_native_core_animation': True,
+            'launch_frame_rate_request': 'device-maximum-not-fixed-60',
+            'launch_mask_dimensions': [1024, 1024],
+            'launch_reduce_motion_respected': True,
+            'launch_live_root_hierarchy_unchanged': True,
             'sidebar_hidden_by_default': ['Money', 'News', 'Jobs'],
             'ios_26_plus_prefetch_workaround': True,
             'device_login_and_stability_tested': False,

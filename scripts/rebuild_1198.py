@@ -77,6 +77,15 @@ def main():
         ipa_branding._apply_resource_pack_to_app(app, brand_work, safe_pack, keep_stock_icons=True)
         ipa_branding._set_display_name_in_app(app)
         info2 = plistlib.loads((app / 'Info.plist').read_bytes())
+        # 11.98 also ships PNG-only alternates, without MSIS catalog facets.
+        # Keep their original file references; the PNG overlay updates their art.
+        for key in ('CFBundleIcons', 'CFBundleIcons~ipad'):
+            old_alternates = info.get(key, {}).get('CFBundleAlternateIcons', {})
+            if old_alternates:
+                alternates = info2.setdefault(key, {}).setdefault('CFBundleAlternateIcons', {})
+                for name, entry in old_alternates.items():
+                    alternates.setdefault(name, entry)
+        (app / 'Info.plist').write_bytes(plistlib.dumps(info2, fmt=plistlib.FMT_BINARY))
         assert info2['CFBundleShortVersionString'] == '11.98'
         assert info2['CFBundleVersion'] == info['CFBundleVersion']
         assert info2['CFBundleIdentifier'] == info['CFBundleIdentifier']

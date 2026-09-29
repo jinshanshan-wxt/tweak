@@ -191,10 +191,12 @@ def _apply_resource_pack_to_app(appdir, workdir, zip_path, keep_stock_icons=Fals
 
         # Sync the loose fallback icons in the app root (used by SpringBoard) to
         # the rebuilt catalog, else the home-screen icon stays stale.
-        _run([
-            sys.executable, str(BRANDING_DIR / "overwrite_loose_icons.py"),
+        if not _run([
+            str(python), str(BRANDING_DIR / "overwrite_loose_icons.py"),
             str(appdir), str(catalog),
-        ])
+            *([str(icons_dir)] if keep_stock_icons else []),
+        ]):
+            raise BrandingError("Branding: failed to update loose fallback icons")
 
     # --- svgs/: override the app's vector glyphs ---
     if have_svgs:

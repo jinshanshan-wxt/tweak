@@ -36,10 +36,17 @@ def png_dims(path):
 
 
 def main():
-    if len(sys.argv) != 3:
-        sys.stderr.write("usage: overwrite_loose_icons.py <app_dir> <catalog_dir>\n")
+    if len(sys.argv) not in (3, 4):
+        sys.stderr.write("usage: overwrite_loose_icons.py <app_dir> <catalog_dir> [overlay_dir]\n")
         return 2
-    app_dir, catalog = sys.argv[1], sys.argv[2]
+    app_dir, catalog = sys.argv[1:3]
+    masters = {}
+    if len(sys.argv) == 4:
+        from scar_merge import pad_resize
+        for folder, _, files in os.walk(sys.argv[3]):
+            for name in files:
+                if name.lower().endswith('.png') and not name.startswith('._'):
+                    masters[os.path.splitext(name)[0]] = os.path.join(folder, name)
 
     with open(os.path.join(catalog, "manifest.json")) as fh:
         manifest = json.load(fh)
@@ -65,6 +72,7 @@ def main():
         by_key[(name, w, h)] = os.path.join(catalog, png)
 
     skipped = []
+    replaced_loose = 0
     for f in os.listdir(app_dir):
         if f.startswith("._") or not f.lower().endswith((".png", ".jpg", ".jpeg")):
             continue
@@ -77,17 +85,22 @@ def main():
         # Longest asset name that prefixes this loose filename (e.g.
         # "ProductionAppIcon60x60@2x.png" -> "ProductionAppIcon").
         cands = [n for n in names if f.startswith(n)]
-        if not cands:
-            continue
-        name = max(cands, key=len)
-        src = by_key.get((name, dims[0], dims[1]))
+        name = max(cands, key=len) if cands else None
+        src = by_key.get((name, dims[0], dims[1])) if name else None
         if src:
             shutil.copyfile(src, fp)
         else:
-            skipped.append((f, "%dx%d" % dims))
+            overlays = [name for name in masters if f.startswith(name)]
+            if overlays:
+                master = masters[max(overlays, key=len)]
+                pad_resize(master, *dims).save(fp)
+                replaced_loose += 1
+            elif name:
+                skipped.append((f, "%dx%d" % dims))
 
     for f, d in skipped:
         sys.stderr.write("no-match: %s (%s) has no catalog rendition of that size\n" % (f, d))
+    print('loose-pack-icons-replaced: %d' % replaced_loose)
     return 0
 
 

@@ -7,8 +7,10 @@ import subprocess
 import tempfile
 import zipfile
 from pathlib import Path
+from hook_abi import render as render_abi
 
 root = Path(__file__).resolve().parents[1]
+assert (root / 'src/Core/HookABI.h').read_text() == render_abi(), 'Hook ABI manifest is stale'
 assert hashlib.sha256((root / 'keychainfix/Tweak.x').read_bytes()).hexdigest() == '83c4864bbfd1243135d5bae25a023d381c83bbaaef0a3fd13ec95e313c792bb1'
 assert hashlib.sha256((root / 'IOS26Compatibility.x').read_bytes()).hexdigest() == '1516732042a974aee12227d045c678cef4c4b715f95ada2ee2c3f1fbb813f971'
 makefile = (root / 'Makefile').read_text()

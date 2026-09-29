@@ -482,6 +482,12 @@ static UIColor* tabItemColor(BOOL selected) {
     }
 
     updatingTabIconColor = YES;
+    if (![self respondsToSelector:@selector(iconColor)] ||
+        ![self respondsToSelector:@selector(setIconColor:)]) {
+        updatingTabIconColor = NO;
+        %orig(animated);
+        return;
+    }
     if ([BHTSettings boolForKey:@"tab_bar_theming"]) {
         self.iconColor = tabItemColor(self.selected);
     } else if (self.iconColor) {

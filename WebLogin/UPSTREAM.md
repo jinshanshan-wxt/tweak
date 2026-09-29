@@ -17,7 +17,8 @@ The existing iOS 26+ (including 27) table prefetch workaround remains unchanged.
 The old inline-action download class is not linked: v7 downloads from the media
 overflow menu instead, avoiding its private inline-layout metrics entirely.
 Legacy root-level tweak/settings sources are retained for history but not built.
-RuntimeCompatibility checks method existence before every v7 Logos hook install.
+RuntimeCompatibility checks method existence AND argument/return ABI before
+every v7 Logos hook install, against a manifest generated from the declarations.
 The 11.98 font group and initial-login factory have explicit compatibility paths.
 Settings switches have one valid target; all pages share an implemented handler.
 The classic launch uses one cached glyph and a bounded 0.28s zoom/fade; it does

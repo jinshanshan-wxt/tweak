@@ -131,6 +131,7 @@ def main():
             'settings_core': 'orionblur-v7-1b24ee11908c',
             'settings_pages': 14,
             'missing_private_hooks_skipped': True,
+            'incompatible_private_hook_abi_skipped': True,
             'launch_transition_seconds': 0.28,
             'ios_26_plus_prefetch_workaround': True,
             'device_login_and_stability_tested': False,

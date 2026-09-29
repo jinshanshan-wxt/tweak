@@ -174,7 +174,7 @@ static NSNumber* FeatureSwitchOverrideValueForKey(NSString* key) {
         [key isEqualToString:@"grok_ios_grok_bot_home_hero_enabled"] ||
         [key isEqualToString:@"grok_ios_grok_bot_preset_enabled"] ||
         [key isEqualToString:@"grok_ios_grok_bot_tab_icon_enabled"]) {
-        return @NO;
+        return [BHTSettings boolForKey:@"hide_grok_sidebar"] ? @NO : nil;
     }
 
     // Session token appended to shared/copied links (&t=)

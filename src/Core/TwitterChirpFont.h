@@ -8,7 +8,6 @@
 #import <UIKit/UIKit.h>
 #import <objc/runtime.h>
 #import "Headers/TAEHeaders.h"
-#import "Core/BHTManager.h"
 
 typedef NS_ENUM(NSInteger, TwitterFontStyle) {
     TwitterFontStyleRegular,
@@ -19,7 +18,9 @@ typedef NS_ENUM(NSInteger, TwitterFontStyle) {
 // Use Twitter's own font group (TFNUIDefaultFontGroup in 12.3) rather than
 // fragile variable-font instance names; falls back to system fonts.
 static inline UIFont* TwitterChirpFont(TwitterFontStyle style) {
-    id group = [BHTManager sharedFontGroup];
+    Class fontClass = objc_getClass("TFNUIDefaultFontGroup") ?: objc_getClass("TAEStandardFontGroup");
+    id group = [fontClass respondsToSelector:@selector(sharedFontGroup)]
+        ? [fontClass sharedFontGroup] : nil;
 
     switch (style) {
         case TwitterFontStyleBold:

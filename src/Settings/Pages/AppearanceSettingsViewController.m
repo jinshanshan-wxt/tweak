@@ -10,6 +10,7 @@
 #import "Core/BHTSettings.h"
 #import "Headers/TWHeaders.h"
 #import "Settings/ModernSettingsCells.h"
+#import <objc/message.h>
 
 @interface AppearanceSettingsViewController () <UIFontPickerViewControllerDelegate>
 @end
@@ -104,7 +105,7 @@
 - (void)refreshTabViewsWithThemingInView:(UIView*)view {
     if ([view isKindOfClass:NSClassFromString(@"T1TabView")]) {
         if ([view respondsToSelector:@selector(_t1_updateImageViewAnimated:)]) {
-            [view performSelector:@selector(_t1_updateImageViewAnimated:) withObject:@(NO)];
+            ((void (*)(id, SEL, BOOL))objc_msgSend)(view, @selector(_t1_updateImageViewAnimated:), NO);
         }
         if ([view respondsToSelector:@selector(_t1_updateTitleLabel)]) {
             [view performSelector:@selector(_t1_updateTitleLabel)];

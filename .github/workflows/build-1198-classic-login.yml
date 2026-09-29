@@ -1,0 +1,80 @@
+name: Build Twitter 11.98 Classic Bird and Web Login
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [nfb-11.98-classic-login]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: twitter-1198-classic-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: macos-14
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: main
+          submodules: recursive
+      - name: Install build dependencies
+        run: brew install make dpkg ldid
+      - name: Add GNU Make
+        run: echo "$(brew --prefix make)/libexec/gnubin" >> "$GITHUB_PATH"
+      - name: Checkout Theos
+        uses: actions/checkout@v4
+        with:
+          repository: theos/theos
+          path: theos
+          submodules: recursive
+      - name: Cache iOS 16.5 SDK
+        uses: actions/cache@v4
+        id: sdk
+        with:
+          path: theos/sdks
+          key: twitter-1198-ios16.5-sdk-v1
+      - name: Download iOS SDK
+        if: steps.sdk.outputs.cache-hit != 'true'
+        run: |
+          git clone -n --depth=1 --filter=tree:0 https://github.com/theos/sdks sdks
+          cd sdks
+          git sparse-checkout set --no-cone iPhoneOS16.5.sdk
+          git checkout
+          mv iPhoneOS16.5.sdk "$GITHUB_WORKSPACE/theos/sdks/"
+      - name: Download pinned stable 11.98 base and classic resource pack
+        working-directory: main
+        run: |
+          set -euo pipefail
+          mkdir -p packages
+          curl -Lf --retry 3 'https://github.com/jinshanshan-wxt/tweak/releases/download/1.0/Twitter-11.98_NeoFreeBird_nosign.ipa' -o packages/base-11.98-stable.ipa
+          curl -Lf --retry 3 'https://files.catbox.moe/p63f20.zip' -o packages/classic-resource-pack.zip
+          echo '030bb98e1eb79b66884c83196ed9dd5ddae92719635fad5ba3e9f915a6767a8b  packages/base-11.98-stable.ipa' | shasum -a 256 -c -
+          echo 'd597b509fe0eef730949f698d6818794d795062703697c53388e2edc1c9d29e2  packages/classic-resource-pack.zip' | shasum -a 256 -c -
+          python3 scripts/test_1198_backport.py
+      - name: Compile selective 11.98 backport
+        working-directory: main
+        env:
+          THEOS: ${{ github.workspace }}/theos
+        run: make SIDELOADED=1
+      - name: Package and verify unsigned 11.98 IPA
+        working-directory: main
+        run: |
+          python3 scripts/rebuild_1198.py packages/base-11.98-stable.ipa packages/classic-resource-pack.zip .theos/obj/debug/BHTwitter.dylib
+          echo "Source commit: $(git rev-parse HEAD)" >> "$GITHUB_STEP_SUMMARY"
+          echo 'Base: user stable Twitter 11.98 (not 12.x)' >> "$GITHUB_STEP_SUMMARY"
+          echo 'Selective classic branding and optional web login; stable iOS 26 hooks preserved.' >> "$GITHUB_STEP_SUMMARY"
+          cat packages/verification.json >> "$GITHUB_STEP_SUMMARY"
+      - name: Upload unsigned IPA and verification
+        uses: actions/upload-artifact@v4
+        with:
+          name: Twitter-11.98_ClassicBird_WebLogin_iOS26_zh-CN_unsigned
+          path: |
+            main/packages/Twitter-11.98_ClassicBird_WebLogin_iOS26_zh-CN_unsigned.ipa
+            main/packages/verification.json
+          compression-level: 0
+          retention-days: 30
+          if-no-files-found: error

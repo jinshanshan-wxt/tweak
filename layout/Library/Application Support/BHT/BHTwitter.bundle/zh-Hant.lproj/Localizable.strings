@@ -492,3 +492,9 @@
 
 "notif_Repost_old" = "轉發";
 "notif_Retweet_new" = "轉推";
+
+"LOG_IN_TITLE" = "登入 Twitter";
+"NFB_CLASSIC_BIRD_TITLE" = "經典小藍鳥";
+"NFB_CLASSIC_BIRD_DETAIL" = "恢復首頁的小藍鳥標誌與經典啟動動畫。資源包替換不受此開關影響。";
+"NFB_WEB_LOGIN_TITLE" = "使用網頁登入";
+"NFB_WEB_LOGIN_DETAIL" = "新增帳號時透過 X 官方網頁完成驗證；已有帳號不會自動改動。可關閉以恢復原生登入。";

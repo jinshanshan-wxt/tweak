@@ -1963,6 +1963,7 @@ static UIFont *TwitterChirpFont(TwitterFontStyle style) {
 - (void)buildSettingsList {
     self.toggles = @[
         @{@"key": @"notif_replace_post_with_tweet", @"titleKey": @"NOTIF_REPLACE_POST_WITH_TWEET_OPTION_TITLE", @"subtitleKey": @"NOTIF_REPLACE_POST_WITH_TWEET_DETAIL_TITLE", @"default": @YES, @"type": @"toggle"},
+        @{@"key": @"nfb_classic_branding", @"titleKey": @"NFB_CLASSIC_BIRD_TITLE", @"subtitleKey": @"NFB_CLASSIC_BIRD_DETAIL", @"default": @YES, @"type": @"toggle"},
         @{@"key": @"refresh_pill_label", @"titleKey": @"REFRESH_PILL_OPTION_TITLE", @"subtitleKey": @"REFRESH_PILL_DETAIL_TITLE", @"default": @YES, @"type": @"toggle"},
         @{@"key": @"color_twitter_icon_in_top_bar", @"titleKey": @"COLOR_TWITTER_ICON_OPTION_TITLE", @"subtitleKey": @"COLOR_TWITTER_ICON_DETAIL_TITLE", @"default": @YES, @"type": @"toggle"}
     ];
@@ -2918,6 +2919,7 @@ if ([type isEqualToString:@"compactButton"]) {
 - (void)buildToggleList {
     self.toggles = @[
         @{ @"key": @"padlock", @"titleKey": @"PADLOCK_OPTION_TITLE", @"subtitleKey": @"PADLOCK_OPTION_DETAIL_TITLE", @"default": @NO },
+        @{ @"key": @"nfb_web_login", @"titleKey": @"NFB_WEB_LOGIN_TITLE", @"subtitleKey": @"NFB_WEB_LOGIN_DETAIL", @"default": @YES },
         @{ @"key": @"hide_topics", @"titleKey": @"HIDE_TOPICS_OPTION_TITLE", @"subtitleKey": @"HIDE_TOPICS_OPTION_DETAIL_TITLE", @"default": @YES },
         @{ @"key": @"hide_topics_to_follow", @"titleKey": @"HIDE_TOPICS_TO_FOLLOW_OPTION", @"subtitleKey": @"HIDE_TOPICS_TO_FOLLOW_OPTION_DETAIL_TITLE", @"default": @YES },
         @{ @"key": @"hide_who_to_follow", @"titleKey": @"HIDE_WHO_FOLLOW_OPTION", @"subtitleKey": @"HIDE_WHO_FOLLOW_OPTION_DETAIL_TITLE", @"default": @YES },

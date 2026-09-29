@@ -422,3 +422,9 @@
 
 "MODERN_SETTINGS_PLACEHOLDER_DETAIL_TEXT" = "此部分即将推出，敬请期待更多 NeoFreeBird 功能！";
 "SOURCE_UNAVAILABLE" = "来源不可用";
+
+"LOG_IN_TITLE" = "登录 Twitter";
+"NFB_CLASSIC_BIRD_TITLE" = "经典小蓝鸟";
+"NFB_CLASSIC_BIRD_DETAIL" = "恢复主页的小蓝鸟标志与经典启动动画。资源包替换不受此开关影响。";
+"NFB_WEB_LOGIN_TITLE" = "使用网页登录";
+"NFB_WEB_LOGIN_DETAIL" = "新增账号时通过 X 官方网页完成验证；已有账号不会自动改动。可关闭以恢复原生登录。";

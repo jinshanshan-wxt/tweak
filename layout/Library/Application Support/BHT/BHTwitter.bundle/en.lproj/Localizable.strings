@@ -492,3 +492,9 @@
 
 "notif_Repost_old" = "Repost";
 "notif_Retweet_new" = "Retweet";
+
+"LOG_IN_TITLE" = "Log in to Twitter";
+"NFB_CLASSIC_BIRD_TITLE" = "Classic Twitter bird";
+"NFB_CLASSIC_BIRD_DETAIL" = "Restore the home logo and classic launch. Bundled resource replacements remain enabled.";
+"NFB_WEB_LOGIN_TITLE" = "Web login";
+"NFB_WEB_LOGIN_DETAIL" = "Use the official X website when adding accounts. Existing sessions stay unchanged; disable to use native login.";

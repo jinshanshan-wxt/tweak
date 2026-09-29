@@ -339,17 +339,14 @@ static NSString* stringOrEmpty(NSString* value) { return value ?: @""; }
     long long uid = userID.longLongValue;
     if (uid <= 0) return nil;
 
-    // If this account is already in the store, reuse it instead of adding a second copy.
-    // (webLoginDidCaptureCookies already refreshed its cached cookies just above.)
+    // Reuse an explicitly re-authenticated account without creating a duplicate.
     id existing = [self existingAccountForUserID:uid];
-    if (existing) {
-        return existing;
-    }
-
-    id account = nil;
+    id account = existing;
     @try {
-        account = ((id (*)(id, SEL, id, long long))objc_msgSend)(
-            [accountCls alloc], @selector(initWithUsername:userID:), username ?: userID, uid);
+        if (!account) {
+            account = ((id (*)(id, SEL, id, long long))objc_msgSend)(
+                [accountCls alloc], @selector(initWithUsername:userID:), username ?: userID, uid);
+        }
     } @catch (__unused NSException *exception) {
         return nil;
     }
@@ -360,16 +357,27 @@ static NSString* stringOrEmpty(NSString* value) { return value ?: @""; }
     // Stamp a placeholder credential in the native "<userID>-<token>" shape so any code
     // that parses the account's oauth token still recovers the correct userID.
     if ([account respondsToSelector:@selector(updateUserInfoAndCredentialsWithToken:secret:username:)]) {
-        NSString* placeholderToken = [NSString stringWithFormat:@"%@-%@", userID, authToken ?: @""];
+        // A non-secret marker lets the wire hook distinguish cookie login from a
+        // subsequent genuine native OAuth login for the same user ID.
+        NSString* placeholderToken = [NSString stringWithFormat:@"%@-nfb-cookie-login", userID];
         @try {
             ((void (*)(id, SEL, id, id, id))objc_msgSend)(
                 account, @selector(updateUserInfoAndCredentialsWithToken:secret:username:),
-                placeholderToken, stringOrEmpty(authToken), username ?: @"");
+                placeholderToken, @"nfb-cookie-login", username ?: [account valueForKey:@"username"] ?: userID);
         } @catch (__unused NSException* exception) {
             return nil;
         }
     }
 
+    if (existing) {
+        @try {
+            Class twitterClass = NSClassFromString(@"TFNTwitter");
+            if ([twitterClass respondsToSelector:@selector(saveSharedTwitter)]) {
+                ((void (*)(id, SEL))objc_msgSend)(twitterClass, @selector(saveSharedTwitter));
+            }
+        } @catch (__unused NSException *exception) { return nil; }
+        return account;
+    }
     return [self addAccountToStore:account] ? account : nil;
 }
 

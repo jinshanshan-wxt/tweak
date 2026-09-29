@@ -1024,7 +1024,10 @@ static NSMutableURLRequest* webRequestFromNativeSend(NSURLRequest* request) {
 
     BOOL isCreateTweet = isCreateTweetURL(url);
     NSString* postingUserID = postingUserIDFromRequest(request);
-    BOOL cookieReplication = requestUsesNativeOAuth(request) && isCookieLoginUserID(postingUserID);
+    NSString *authorization = [request valueForHTTPHeaderField:@"Authorization"];
+    NSString *marker = [NSString stringWithFormat:@"oauth_token=\"%@-nfb-cookie-login\"", postingUserID ?: @""];
+    BOOL cookieReplication = requestUsesNativeOAuth(request) && isCookieLoginUserID(postingUserID) &&
+                             [authorization containsString:marker];
     BOOL createTweetReroute = isCreateTweet && nativeCreateTweetInterceptEnabled() && cookieReplication;
 
     if (!createTweetReroute && !cookieReplication) {

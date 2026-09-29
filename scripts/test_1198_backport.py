@@ -30,6 +30,7 @@ assert '[hosts containsObject:url.host.lowercaseString]' in session
 assert 'isCreateTweet && nativeCreateTweetInterceptEnabled() && cookieReplication' in session
 assert 'kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly' in session
 assert 'BHTSettings' not in session
+assert '[authorization containsString:marker]' in session
 for path in (root / 'WebLogin').glob('*.m'):
     # Format-required UTF-8 source, but all Simplified Chinese added by this patch
     # must also be representable in GBK (the user's document preference).

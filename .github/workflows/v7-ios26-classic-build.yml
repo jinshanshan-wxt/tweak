@@ -1,0 +1,187 @@
+name: Build NeoFreeBird v7 iOS 26 Classic Twitter
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  ffmpeg:
+    name: Build ffmpeg stack
+    runs-on: macos-latest
+    outputs:
+      cache-key: ${{ steps.ffmpeg-key.outputs.key }}
+
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v6
+        with:
+          submodules: recursive
+
+      - name: Compute ffmpeg cache key
+        id: ffmpeg-key
+        run: |
+          echo "key=ffmpeg-stack-sdk$(xcrun --sdk iphoneos --show-sdk-version)-$(git rev-parse --short HEAD:deps/ffmpeg-kit-next/upstream)-${{ hashFiles('deps/ffmpeg-kit-next/build-ffmpeg.sh') }}" >> "$GITHUB_OUTPUT"
+
+      - name: Restore ffmpeg cache
+        id: cache
+        uses: actions/cache@v5
+        with:
+          path: |
+            ffmpeg-build
+            deps/ffmpeg-kit-next/build
+          key: ${{ steps.ffmpeg-key.outputs.key }}
+
+      - name: Build ffmpeg stack
+        if: steps.cache.outputs.cache-hit != 'true'
+        run: deps/ffmpeg-kit-next/build-ffmpeg.sh
+        env:
+          BUILD_DIR: ${{ github.workspace }}/ffmpeg-build
+
+  build:
+    name: Build unsigned classic Twitter IPA
+    runs-on: macos-latest
+    needs: ffmpeg
+
+    steps:
+      - name: Checkout patched NeoFreeBird
+        uses: actions/checkout@v6
+        with:
+          submodules: recursive
+
+      - name: Install build dependencies
+        run: brew install make dpkg ldid
+
+      - name: Add GNU Make to PATH
+        run: echo "$(brew --prefix make)/libexec/gnubin" >> "$GITHUB_PATH"
+
+      - name: Download Theos
+        uses: actions/checkout@v6
+        with:
+          repository: theos/theos
+          ref: master
+          path: theos
+          submodules: recursive
+
+      - name: Download iOS 16.5 SDK
+        env:
+          THEOS: ${{ github.workspace }}/theos
+        run: |
+          git clone -n --depth=1 --filter=tree:0 https://github.com/theos/sdks/ sdks
+          cd sdks
+          git sparse-checkout set --no-cone iPhoneOS16.5.sdk
+          git checkout
+          mv ./*.sdk "$THEOS/sdks/"
+
+      - name: Restore ffmpeg stack
+        uses: actions/cache@v5
+        with:
+          path: |
+            ffmpeg-build
+            deps/ffmpeg-kit-next/build
+          key: ${{ needs.ffmpeg.outputs.cache-key }}
+
+      - name: Compile patched NeoFreeBird
+        env:
+          THEOS: ${{ github.workspace }}/theos
+          BUILD_DIR: ${{ github.workspace }}/ffmpeg-build
+        run: |
+          make clean || true
+          rm -rf .theos
+          make SIDELOADED=1
+          test -f .theos/obj/debug/BHTwitter.dylib
+          strings .theos/obj/debug/BHTwitter.dylib | grep 'setPrefetchingEnabled:' >/dev/null
+          strings .theos/obj/debug/BHTwitter.dylib | grep 'restore_twitter_names' >/dev/null
+
+      - name: Download verified v7 Twitter-branded base
+        env:
+          BASE_IPA_URL: https://github.com/orionblur/NeoFreeBird/releases/download/v7.0.0/orionblur-NFB-BHTwitter-sideloaded-Twitter_7.0.0_12.28.1.ipa
+        run: |
+          curl -L --fail --retry 3 "$BASE_IPA_URL" -o base.ipa
+          unzip -tq base.ipa
+
+      - name: Replace tweak and apply iOS 26 settings
+        shell: bash
+        run: |
+          set -euo pipefail
+          STAGE="$(mktemp -d)"
+          ditto -x -k base.ipa "$STAGE"
+          APP_DIR="$(find "$STAGE/Payload" -mindepth 1 -maxdepth 1 -type d -name '*.app' -print -quit)"
+          test -n "$APP_DIR"
+
+          BUILT_DYLIB="$GITHUB_WORKSPACE/.theos/obj/debug/BHTwitter.dylib"
+          EMBEDDED_DYLIB="$(find "$APP_DIR" -type f -name BHTwitter.dylib -print -quit)"
+          test -n "$EMBEDDED_DYLIB"
+
+          while IFS= read -r DEP; do
+            case "$DEP" in
+              /Library/Frameworks/*)
+                PORTABLE="@rpath/${DEP#/Library/Frameworks/}"
+                install_name_tool -change "$DEP" "$PORTABLE" "$BUILT_DYLIB"
+                ;;
+            esac
+          done < <(xcrun otool -L "$BUILT_DYLIB" | tail -n +2 | awk '{print $1}')
+
+          if xcrun otool -L "$BUILT_DYLIB" | grep -E '^[[:space:]]*/Library/Frameworks/'; then
+            echo "Absolute jailbreak framework path remains"
+            exit 1
+          fi
+
+          cp "$BUILT_DYLIB" "$EMBEDDED_DYLIB"
+          SOURCE_BUNDLE="$GITHUB_WORKSPACE/layout/Library/Application Support/BHT/BHTwitter.bundle"
+          rm -rf "$APP_DIR/BHTwitter.bundle"
+          cp -R "$SOURCE_BUNDLE" "$APP_DIR/BHTwitter.bundle"
+
+          /usr/libexec/PlistBuddy -c 'Delete :CADisableMinimumFrameDurationOnPhone' "$APP_DIR/Info.plist" 2>/dev/null || true
+          /usr/libexec/PlistBuddy -c 'Add :CADisableMinimumFrameDurationOnPhone bool true' "$APP_DIR/Info.plist"
+
+          find "$STAGE/Payload" -type d -name _CodeSignature -prune -exec rm -rf {} +
+          find "$STAGE/Payload" -type f -name embedded.mobileprovision -delete
+
+          OUTPUT="$GITHUB_WORKSPACE/NeoFreeBird-v7.0.0-ios26.1-Classic-Twitter-X12.28.1-unsigned.ipa"
+          (cd "$STAGE" && /usr/bin/zip -qry "$OUTPUT" Payload)
+          echo "OUTPUT=$OUTPUT" >> "$GITHUB_ENV"
+
+      - name: Verify unsigned IPA
+        env:
+          OUTPUT: ${{ env.OUTPUT }}
+        run: |
+          python3 <<'PY'
+          import os
+          import plistlib
+          import zipfile
+
+          output = os.environ["OUTPUT"]
+          with zipfile.ZipFile(output) as archive:
+              names = archive.namelist()
+              plist_name = next(
+                  name for name in names
+                  if name.startswith("Payload/")
+                  and name.count("/") == 2
+                  and name.endswith(".app/Info.plist")
+              )
+              plist = plistlib.loads(archive.read(plist_name))
+              assert plist["CFBundleShortVersionString"] == "12.28.1"
+              assert plist.get("CFBundleDisplayName") == "Twitter"
+              assert plist.get("CADisableMinimumFrameDurationOnPhone") is True
+              assert sum(name.endswith("/BHTwitter.dylib") for name in names) == 1
+              assert any(name.endswith("/BHTwitter.bundle/zh_CN.lproj/Localizable.strings") for name in names)
+              assert any(name.endswith("/BHTwitter.bundle/zh_CN.lproj/RenameWords.strings") for name in names)
+              assert not any("/_CodeSignature/" in name for name in names)
+              assert not any(name.endswith("/embedded.mobileprovision") for name in names)
+          print("Verified unsigned IPA:", os.path.getsize(output), "bytes")
+          PY
+          unzip -p "$OUTPUT" 'Payload/*.app/BHTwitter.dylib' | strings | grep 'setPrefetchingEnabled:' >/dev/null
+          unzip -p "$OUTPUT" 'Payload/*.app/BHTwitter.dylib' | strings | grep 'restore_twitter_names' >/dev/null
+          echo "IPA SHA-256: $(shasum -a 256 "$OUTPUT" | awk '{print $1}')" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload unsigned IPA
+        uses: actions/upload-artifact@v7
+        with:
+          name: NeoFreeBird-v7.0.0-ios26.1-Classic-Twitter-X12.28.1-unsigned
+          path: ${{ env.OUTPUT }}
+          archive: false
+          if-no-files-found: error
+          retention-days: 30

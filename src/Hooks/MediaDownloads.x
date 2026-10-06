@@ -469,7 +469,7 @@ static void SetVoiceDownloadLongPressRecognizer(UIView* view,
 - (void)nfb_downloadTapped {
     id model = self.delegate.viewModel ?: self.viewModel;
     if (![model respondsToSelector:@selector(representedMediaEntities)]) return;
-    NSArray* media = [model representedMediaEntities];
+    NSArray* media = [model valueForKey:@"representedMediaEntities"];
     if (![media isKindOfClass:NSArray.class] || media.count == 0) return;
     DownloadInlineButton* handler = objc_getAssociatedObject(self, @selector(nfb_downloadTapped));
     if (!handler) {

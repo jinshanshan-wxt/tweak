@@ -401,6 +401,14 @@ static void SetVoiceDownloadLongPressRecognizer(UIView* view,
     }
 
     NSArray* mediaEntities = [[status entities] media];
+    // A mixed photo/video tweet can place only its first photo in entities.
+    // Prefer the complete extended media set when the model exposes it.
+    @try {
+        id extended = [status valueForKey:@"extendedEntities"];
+        NSArray* complete = [extended respondsToSelector:@selector(media)] ? [extended media] :
+                            ([extended isKindOfClass:NSArray.class] ? extended : nil);
+        if (complete.count > mediaEntities.count) mediaEntities = complete;
+    } @catch (__unused NSException* exception) {}
     BOOL hasVideo = NO;
     // mediaType 2 = GIF, 3 = video
     for (TFSTwitterEntityMedia* media in mediaEntities) {
@@ -434,3 +442,56 @@ static void SetVoiceDownloadLongPressRecognizer(UIView* view,
     return newItems;
 }
 %end
+
+// Restore the inline video action lost when the archived tweak was replaced.
+@interface NFBVideoDownloadActionButton : UIButton
+@property(nonatomic, weak) TTAStatusInlineActionsView* delegate;
+@property(nonatomic, strong) id viewModel;
+@property(nonatomic, strong) id buttonAnimator;
+@property(nonatomic, assign) NSUInteger inlineActionType;
+@property(nonatomic, assign) NSUInteger displayType;
+@property(nonatomic, assign) UIEdgeInsets touchInsets;
+@end
+
+@implementation NFBVideoDownloadActionButton
++ (CGSize)buttonImageSizeUsingViewModel:(id)model options:(NSUInteger)options overrideButtonSize:(CGSize)size account:(id)account { return CGSizeZero; }
+- (instancetype)initWithFrame:(CGRect)frame {
+    if ((self = [super initWithFrame:frame])) {
+        self.inlineActionType = 131;
+        self.tintColor = [UIColor colorWithWhite:0.43 alpha:1.0];
+        [self setImage:[UIImage systemImageNamed:@"arrow.down"] forState:UIControlStateNormal];
+        [self addTarget:self action:@selector(nfb_downloadTapped) forControlEvents:UIControlEventTouchUpInside];
+    }
+    return self;
+}
+- (instancetype)initWithOptions:(NSUInteger)options overrideSize:(id)size account:(id)account { return [self initWithFrame:CGRectZero]; }
+- (instancetype)initWithInlineActionType:(NSUInteger)type options:(NSUInteger)options overrideSize:(id)size account:(id)account { return [self initWithFrame:CGRectZero]; }
+- (void)nfb_downloadTapped {
+    id model = self.delegate.viewModel ?: self.viewModel;
+    if (![model respondsToSelector:@selector(representedMediaEntities)]) return;
+    NSArray* media = [model representedMediaEntities];
+    if (![media isKindOfClass:NSArray.class] || media.count == 0) return;
+    DownloadInlineButton* handler = objc_getAssociatedObject(self, @selector(nfb_downloadTapped));
+    if (!handler) {
+        handler = [DownloadInlineButton new];
+        objc_setAssociatedObject(self, @selector(nfb_downloadTapped), handler, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    }
+    [handler presentDownloadOptionsForMediaEntities:media];
+}
+- (void)statusDidUpdate:(id)status options:(NSUInteger)options displayTextOptions:(NSUInteger)textOptions animated:(BOOL)animated {}
+- (void)statusDidUpdate:(id)status options:(NSUInteger)options displayTextOptions:(NSUInteger)textOptions animated:(BOOL)animated featureSwitches:(id)switches {}
+- (id)_t1_imageNamed:(id)name fitSize:(CGSize)size fillColor:(id)fill { return nil; }
++ (id)_t1_imageNamed:(id)name fitSize:(CGSize)size fillColor:(id)fill { return nil; }
+- (void)setTouchInsets:(UIEdgeInsets)insets { _touchInsets = insets; self.imageEdgeInsets = insets; }
+#define NFB_INLINE_METRIC(name, value) - (typeof(value))name { return value; } + (typeof(value))name { return value; }
+NFB_INLINE_METRIC(extraWidth, 40.0)
+NFB_INLINE_METRIC(extraWidthWithStyle, 40.0)
+NFB_INLINE_METRIC(trailingEdgeInset, 6.0)
+NFB_INLINE_METRIC(visibility, (NSUInteger)1)
+NFB_INLINE_METRIC(alternateInlineActionType, (NSUInteger)6)
+NFB_INLINE_METRIC(touchInsetPriority, (NSUInteger)2)
+NFB_INLINE_METRIC(shouldShowCount, NO)
+NFB_INLINE_METRIC(horizontalLayoutOffset, 0.0)
+#undef NFB_INLINE_METRIC
+- (NSString*)actionSheetTitle { return @"Download"; }
+@end

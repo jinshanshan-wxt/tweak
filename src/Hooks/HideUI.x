@@ -224,6 +224,18 @@
         [newClasses removeObject:downvoteButtonClass];
     }
 
+        // The old 11.98 build exposed a direct download action here.
+    if ([BHTSettings boolForKey:@"download_videos"] &&
+        [arg1 respondsToSelector:@selector(representedMediaEntities)]) {
+        for (TFSTwitterEntityMedia* media in [arg1 representedMediaEntities]) {
+            if (media.videoInfo.variants.count == 0) continue;
+            Class downloadClass = objc_getClass("NFBVideoDownloadActionButton");
+            if (downloadClass && ![newClasses containsObject:downloadClass])
+                [newClasses addObject:downloadClass];
+            break;
+        }
+    }
+
     return [newClasses copy];
 }
 

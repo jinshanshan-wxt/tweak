@@ -79,6 +79,12 @@ for key in ('hide_grok_analyze', 'hide_grok_sidebar', 'hide_grok_create', 'disab
 assert 'TAEStandardFontGroup' in (root / 'src/Core/BHTManager.m').read_text()
 assert 'NFBHookExistingMessage' in (root / 'src/Hooks/HookHelpers.h').read_text() + (root / 'src/Core/RuntimeCompatibility.h').read_text()
 assert '@interface DownloadInlineButton : NSObject' in (root / 'src/Download/DownloadInlineButton.h').read_text()
+media_downloads = (root / 'src/Hooks/MediaDownloads.x').read_text()
+assert '@interface NFBVideoDownloadActionItem : TFNActionItem' in media_downloads
+assert 'return ![self respondsToSelector:@selector(isDisabled)] || ![self isDisabled]' in media_downloads
+assert '![item isKindOfClass:%c(TFNActionItem)]' in media_downloads
+assert '+ (BOOL)enabled { return YES; }' in media_downloads
+assert '- (BOOL)enabled { return [super isEnabled]; }' in media_downloads
 launch = (root / 'src/Hooks/Launch.x').read_text()
 assert launch.count('%hook') == 1 and launch.count('- (void)') == 3
 assert '((UIView *)self).hidden = YES' in launch

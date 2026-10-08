@@ -382,6 +382,22 @@ static void SetVoiceDownloadLongPressRecognizer(UIView* view,
 
 // MARK: - Tweet video download
 
+// 11.98's TFNActionItem exposes -isDisabled, while the newer action-list
+// renderer asks each item for -enabled. Keep that compatibility method local
+// to our injected item rather than changing every native action item.
+@interface TFNActionItem (NFBVideoDownloadState)
+- (BOOL)isDisabled;
+@end
+
+@interface NFBVideoDownloadActionItem : TFNActionItem
+@end
+
+@implementation NFBVideoDownloadActionItem
+- (BOOL)enabled {
+    return ![self respondsToSelector:@selector(isDisabled)] || ![self isDisabled];
+}
+@end
+
 // _t1_actionItemsForStatus:... is a category method on UIViewController, so the
 // hook has to land on the base class to cover every share/action sheet.
 %hook UIViewController
@@ -396,8 +412,15 @@ static void SetVoiceDownloadLongPressRecognizer(UIView* view,
     NSArray* origItems = %orig;
 
     if (![BHTSettings boolForKey:@"download_videos"] ||
-        ![status respondsToSelector:@selector(entities)]) {
+        ![status respondsToSelector:@selector(entities)] ||
+        ![origItems isKindOfClass:NSArray.class] || origItems.count == 0) {
         return origItems;
+    }
+
+    // This legacy hook can also return newer action-model objects. Never mix
+    // TFNActionItem into a list whose elements use a different ABI.
+    for (id item in origItems) {
+        if (![item isKindOfClass:%c(TFNActionItem)]) return origItems;
     }
 
     NSArray* mediaEntities = [[status entities] media];
@@ -429,12 +452,21 @@ static void SetVoiceDownloadLongPressRecognizer(UIView* view,
         objc_setAssociatedObject(self, &downloaderKey, downloader, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
     }
 
-    TFNActionItem* downloadItem = [%c(TFNActionItem)
+    TFNActionItem* downloadItem = [NFBVideoDownloadActionItem
         actionItemWithTitle:[[BHTBundle sharedBundle] localizedStringForKey:@"DOWNLOAD_VIDEOS_TITLE"]
                   imageName:@"arrow_down_circle_stroke"
                      action:^{
                          [downloader presentDownloadOptionsForMediaEntities:mediaEntities];
                      }];
+
+    // Some versions implement the factory with a hard-coded base allocation.
+    // The subclass has no ivars, so it is layout-compatible with the base.
+    if (object_getClass(downloadItem) == %c(TFNActionItem) &&
+        class_getInstanceSize(object_getClass(downloadItem)) ==
+            class_getInstanceSize(NFBVideoDownloadActionItem.class)) {
+        object_setClass(downloadItem, NFBVideoDownloadActionItem.class);
+    }
+    if (![downloadItem respondsToSelector:@selector(enabled)]) return origItems;
 
     NSMutableArray* newItems = origItems ? [origItems mutableCopy] : [NSMutableArray array];
     NSUInteger insertIndex = newItems.count > 0 ? newItems.count - 1 : 0;
@@ -455,6 +487,8 @@ static void SetVoiceDownloadLongPressRecognizer(UIView* view,
 
 @implementation NFBVideoDownloadActionButton
 + (CGSize)buttonImageSizeUsingViewModel:(id)model options:(NSUInteger)options overrideButtonSize:(CGSize)size account:(id)account { return CGSizeZero; }
++ (BOOL)enabled { return YES; }
+- (BOOL)enabled { return [super isEnabled]; }
 - (instancetype)initWithFrame:(CGRect)frame {
     if ((self = [super initWithFrame:frame])) {
         self.inlineActionType = 131;

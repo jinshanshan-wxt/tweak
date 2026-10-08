@@ -385,18 +385,31 @@ static void SetVoiceDownloadLongPressRecognizer(UIView* view,
 // 11.98's TFNActionItem exposes -isDisabled, while the newer action-list
 // renderer asks each item for -enabled. Keep that compatibility method local
 // to our injected item rather than changing every native action item.
-@interface TFNActionItem (NFBVideoDownloadState)
-- (BOOL)isDisabled;
-@end
-
-@interface NFBVideoDownloadActionItem : TFNActionItem
-@end
-
-@implementation NFBVideoDownloadActionItem
-- (BOOL)enabled {
-    return ![self respondsToSelector:@selector(isDisabled)] || ![self isDisabled];
+static BOOL NFBVideoActionItemEnabled(id item, SEL selector) {
+    SEL isDisabled = @selector(isDisabled);
+    if (![item respondsToSelector:isDisabled]) return YES;
+    IMP implementation = [item methodForSelector:isDisabled];
+    return !((BOOL (*)(id, SEL))implementation)(item, isDisabled);
 }
-@end
+
+static Class NFBVideoActionItemClass(void) {
+    static Class itemClass = Nil;
+    static dispatch_once_t onceToken;
+    dispatch_once(&onceToken, ^{
+        Class baseClass = objc_getClass("TFNActionItem");
+        if (!baseClass) return;
+        itemClass = objc_allocateClassPair(baseClass, "NFBVideoDownloadActionItem", 0);
+        if (!itemClass) return;
+        if (!class_addMethod(itemClass, @selector(enabled),
+                             (IMP)NFBVideoActionItemEnabled, "B@:")) {
+            objc_disposeClassPair(itemClass);
+            itemClass = Nil;
+            return;
+        }
+        objc_registerClassPair(itemClass);
+    });
+    return itemClass;
+}
 
 // _t1_actionItemsForStatus:... is a category method on UIViewController, so the
 // hook has to land on the base class to cover every share/action sheet.
@@ -452,7 +465,9 @@ static void SetVoiceDownloadLongPressRecognizer(UIView* view,
         objc_setAssociatedObject(self, &downloaderKey, downloader, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
     }
 
-    TFNActionItem* downloadItem = [NFBVideoDownloadActionItem
+    Class itemClass = NFBVideoActionItemClass();
+    if (!itemClass) return origItems;
+    TFNActionItem* downloadItem = [(id)itemClass
         actionItemWithTitle:[[BHTBundle sharedBundle] localizedStringForKey:@"DOWNLOAD_VIDEOS_TITLE"]
                   imageName:@"arrow_down_circle_stroke"
                      action:^{
@@ -463,8 +478,8 @@ static void SetVoiceDownloadLongPressRecognizer(UIView* view,
     // The subclass has no ivars, so it is layout-compatible with the base.
     if (object_getClass(downloadItem) == %c(TFNActionItem) &&
         class_getInstanceSize(object_getClass(downloadItem)) ==
-            class_getInstanceSize(NFBVideoDownloadActionItem.class)) {
-        object_setClass(downloadItem, NFBVideoDownloadActionItem.class);
+            class_getInstanceSize(itemClass)) {
+        object_setClass(downloadItem, itemClass);
     }
     if (![downloadItem respondsToSelector:@selector(enabled)]) return origItems;
 

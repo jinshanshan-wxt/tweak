@@ -80,8 +80,9 @@ assert 'TAEStandardFontGroup' in (root / 'src/Core/BHTManager.m').read_text()
 assert 'NFBHookExistingMessage' in (root / 'src/Hooks/HookHelpers.h').read_text() + (root / 'src/Core/RuntimeCompatibility.h').read_text()
 assert '@interface DownloadInlineButton : NSObject' in (root / 'src/Download/DownloadInlineButton.h').read_text()
 media_downloads = (root / 'src/Hooks/MediaDownloads.x').read_text()
-assert '@interface NFBVideoDownloadActionItem : TFNActionItem' in media_downloads
-assert 'return ![self respondsToSelector:@selector(isDisabled)] || ![self isDisabled]' in media_downloads
+assert 'objc_allocateClassPair(baseClass, "NFBVideoDownloadActionItem", 0)' in media_downloads
+assert 'class_addMethod(itemClass, @selector(enabled)' in media_downloads
+assert 'return !((BOOL (*)(id, SEL))implementation)(item, isDisabled)' in media_downloads
 assert '![item isKindOfClass:%c(TFNActionItem)]' in media_downloads
 assert '+ (BOOL)enabled { return YES; }' in media_downloads
 assert '- (BOOL)enabled { return [super isEnabled]; }' in media_downloads
